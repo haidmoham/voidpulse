@@ -235,6 +235,77 @@ def demos():
 RECCOBEATS_BASE = "https://api.reccobeats.com/v1"
 
 
+# ── LRCLIB synced lyrics proxy ──────────────────────────────────────
+# Spotify's official Web API doesn't expose lyrics (they're licensed
+# through Musixmatch for first-party clients only). LRCLIB
+# (https://lrclib.net) is a free, no-auth community lyrics database that
+# returns LRC-format synced lyrics ("[mm:ss.xx] line text") for most
+# popular tracks. We proxy through Flask for CORS + to attach a polite
+# User-Agent + to cache misses so we don't re-hit LRCLIB for every poll
+# on an unindexed track.
+
+LRCLIB_API   = "https://lrclib.net/api/get"
+_LYRICS_TTL  = 24 * 3600
+_LYRICS_MAX  = 256
+_lyrics_cache: dict = {}   # spotify_id → (json_or_None, fetched_at)
+
+
+@spotify_bp.route("/lyrics/<spotify_id>")
+def lyrics(spotify_id: str):
+    """Return LRCLIB lyrics data for a Spotify track id. Query params:
+    track, artist (required); album, duration (recommended for accuracy).
+    Cached for 24h per spotify_id; 404 misses are cached too."""
+    if not spotify_id.isalnum() or len(spotify_id) > 32:
+        return jsonify({"error": "invalid_id"}), 400
+
+    now = time.time()
+    cached = _lyrics_cache.get(spotify_id)
+    if cached and now - cached[1] < _LYRICS_TTL:
+        body = cached[0]
+        if body is None:
+            return jsonify({"error": "not_found"}), 404
+        return jsonify(body)
+
+    track  = request.args.get("track",  "").strip()
+    artist = request.args.get("artist", "").strip()
+    if not track or not artist:
+        return jsonify({"error": "missing_track_or_artist"}), 400
+
+    params = {"track_name": track, "artist_name": artist}
+    album    = request.args.get("album", "").strip()
+    duration = request.args.get("duration", "").strip()
+    if album:    params["album_name"] = album
+    if duration: params["duration"]   = duration
+
+    try:
+        r = requests.get(
+            LRCLIB_API,
+            params=params,
+            headers={"User-Agent": "Voidpulse Visualizer (https://github.com/haidmoham/voidpulse)"},
+            timeout=6,
+        )
+    except requests.RequestException as e:
+        return jsonify({"error": "lrclib_unreachable", "detail": str(e)}), 502
+
+    # Bound cache: evict oldest entry when full.
+    if len(_lyrics_cache) >= _LYRICS_MAX:
+        oldest_key = min(_lyrics_cache, key=lambda k: _lyrics_cache[k][1])
+        _lyrics_cache.pop(oldest_key, None)
+
+    if r.status_code == 404:
+        _lyrics_cache[spotify_id] = (None, now)
+        return jsonify({"error": "not_found"}), 404
+    if not r.ok:
+        return jsonify({"error": "lrclib_failed", "status": r.status_code}), 502
+
+    try:
+        data = r.json()
+    except ValueError:
+        return jsonify({"error": "lrclib_bad_response"}), 502
+    _lyrics_cache[spotify_id] = (data, now)
+    return jsonify(data)
+
+
 @spotify_bp.route("/features/<spotify_id>")
 def features(spotify_id: str):
     """Return ReccoBeats audio features for a Spotify track id.

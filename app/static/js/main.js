@@ -38,6 +38,8 @@ const npCard   = document.getElementById("now-playing");
 const npArt    = document.getElementById("np-art");
 const npTrack  = document.getElementById("np-track");
 const npArtist = document.getElementById("np-artist");
+const lyricsEl     = document.getElementById("lyrics");
+const lyricLineEl  = lyricsEl?.querySelector(".lyric-line");
 
 // ── custom cursor ────────────────────────────────────────────
 const cursorEl   = document.getElementById("cursor");
@@ -375,6 +377,30 @@ function formatSpotifyLabel() {
   return `spotify · ${track.name}${artists ? " — " + artists : ""}${status}${where}`;
 }
 
+/** Render the active synced lyric line. Empty/null hides the overlay.
+ *  LRC sometimes has blank lines at instrumental breaks — honor them by
+ *  fading out for the duration instead of holding the previous line. */
+let _lyricFadeTimer = 0;
+function renderLyric(line) {
+  if (!lyricsEl || !lyricLineEl) return;
+  const text = (line?.text || "").trim();
+  if (!text) {
+    lyricsEl.classList.remove("lyrics-visible");
+    lyricLineEl.classList.remove("lyric-show");
+    return;
+  }
+  lyricsEl.classList.add("lyrics-visible");
+  // Two-stage swap: fade old line out, swap text, fade new line in. The
+  // 180ms delay matches the CSS transition just enough to feel deliberate
+  // without lagging behind the music perceptibly.
+  lyricLineEl.classList.remove("lyric-show");
+  clearTimeout(_lyricFadeTimer);
+  _lyricFadeTimer = setTimeout(() => {
+    lyricLineEl.textContent = text;
+    lyricLineEl.classList.add("lyric-show");
+  }, 180);
+}
+
 /** Show/hide the now-playing card based on current Spotify state. */
 function updateNowPlaying() {
   const track = spotify.currentTrack;
@@ -457,12 +483,13 @@ async function activateSpotify() {
   // When no audio source is active, SpotifyWatcher.tick() synthesises bands
   // from the track's BPM so the cloud still breathes in time.
   try {
-    spotify.onTrackChange  = () => { refreshUi(); updateNowPlaying(); };
+    spotify.onTrackChange  = () => { refreshUi(); updateNowPlaying(); renderLyric(null); };
     spotify.onStateChange  = () => { refreshUi(); updateNowPlaying(); };
     spotify.onFeaturesLoad = (features) => {
       const palette = paletteForMood(features);
       if (palette) applyPalette(palette);
     };
+    spotify.onLyricLine    = (line) => renderLyric(line);
     spotify.onError = ({ type, message }) => {
       if (type !== "poll") showError(`Spotify ${type.replace(/_/g, " ")}: ${message}`);
     };
@@ -565,6 +592,10 @@ function frame() {
     freqDataR: audio.rawFreqR(),
   };
   viz.render(bands, audio.rawFreq(), beat, stereo);
+  // Resolve the active synced lyric line against the extrapolated Spotify
+  // playhead. Fires onLyricLine only when the index changes, so the DOM
+  // touch is rare even though this runs every frame.
+  if (spotify.lyrics) spotify.currentLyric();
   if (beat) pulseCursor();
   drawFavicon(beat);
   // Update XP trail: each ghost fades + shrinks toward the back.

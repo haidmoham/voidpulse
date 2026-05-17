@@ -39,6 +39,11 @@ export class SpotifyWatcher {
     this.features        = null;   // { tempo, energy, valence, key, ... } or null
     this._featuresTrackId = null;
 
+    // Synced lyrics (LRCLIB), refreshed on track change
+    this.lyrics          = null;   // [{ ms, text }, ...] sorted by ms, or null
+    this._lyricsTrackId  = null;
+    this._currentLyricIdx = -1;
+
     // BPM pulse state
     this._lastPulseMs    = -Infinity;
 
@@ -50,6 +55,8 @@ export class SpotifyWatcher {
     this.onTrackChange   = null;   // (track, device)              => void
     this.onStateChange   = null;   // ({track, device, isPlaying}) => void
     this.onFeaturesLoad  = null;   // (features)                   => void
+    this.onLyricsLoad    = null;   // (lines | null)               => void
+    this.onLyricLine     = null;   // (line | null, idx, allLines) => void
     this.onError         = null;   // ({type, message})            => void
   }
 
@@ -75,7 +82,11 @@ export class SpotifyWatcher {
     this.isPlaying     = false;
     this.features      = null;
     this._featuresTrackId = null;
+    this.lyrics        = null;
+    this._lyricsTrackId = null;
+    this._currentLyricIdx = -1;
     this._lastPulseMs  = -Infinity;
+    this.onLyricLine?.(null, -1, null);
   }
 
   /**
@@ -175,13 +186,23 @@ export class SpotifyWatcher {
     this._anchorClockMs = performance.now();
 
     if (trackChanged) {
-      this.features       = null;
-      this._lastPulseMs   = -Infinity;
+      this.features         = null;
+      this.lyrics           = null;
+      this._lyricsTrackId   = null;
+      this._currentLyricIdx = -1;
+      this._lastPulseMs     = -Infinity;
       this.onTrackChange?.(this.currentTrack, this.currentDevice);
+      this.onLyricLine?.(null, -1, null);
       this._fetchFeatures(newTrackId).catch(err => {
         // Most likely "track_not_indexed" (404) — fine, just no auto-palette.
         if (!String(err.message).includes("404")) {
           this.onError?.({ type: "features", message: err.message || String(err) });
+        }
+      });
+      this._fetchLyrics(this.currentTrack).catch(err => {
+        // 404 = LRCLIB has no match for this track, common — stay silent.
+        if (!String(err.message).includes("404")) {
+          this.onError?.({ type: "lyrics", message: err.message || String(err) });
         }
       });
     }
@@ -195,12 +216,82 @@ export class SpotifyWatcher {
 
   _handleNoPlayback() {
     if (!this.currentTrack && !this.isPlaying) return;
-    this.currentTrack   = null;
-    this.currentDevice  = null;
-    this.isPlaying      = false;
-    this.features       = null;
-    this._lastPulseMs   = -Infinity;
+    this.currentTrack     = null;
+    this.currentDevice    = null;
+    this.isPlaying        = false;
+    this.features         = null;
+    this.lyrics           = null;
+    this._lyricsTrackId   = null;
+    this._currentLyricIdx = -1;
+    this._lastPulseMs     = -Infinity;
     this.onStateChange?.({ track: null, device: null, isPlaying: false });
+    this.onLyricLine?.(null, -1, null);
+  }
+
+  /**
+   * Resolve the currently-active lyric line against the live playhead.
+   * Called once per render frame from main.js. Fires onLyricLine when the
+   * active line changes (track advance OR user seek; binary-searched so a
+   * seek doesn't get stuck on a stale index).
+   * Returns the active { ms, text } line or null if none.
+   */
+  currentLyric() {
+    if (!this.lyrics || !this.isPlaying) {
+      if (this._currentLyricIdx !== -1) {
+        this._currentLyricIdx = -1;
+        this.onLyricLine?.(null, -1, this.lyrics);
+      }
+      return null;
+    }
+    const pos   = this.estimatePositionMs();
+    const lines = this.lyrics;
+    // Binary search for the last line with ms <= pos.
+    let lo = 0, hi = lines.length - 1, idx = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (lines[mid].ms <= pos) { idx = mid; lo = mid + 1; }
+      else hi = mid - 1;
+    }
+    if (idx !== this._currentLyricIdx) {
+      this._currentLyricIdx = idx;
+      this.onLyricLine?.(idx >= 0 ? lines[idx] : null, idx, lines);
+    }
+    return idx >= 0 ? lines[idx] : null;
+  }
+
+  async _fetchLyrics(track) {
+    if (!track?.id) return;
+    const params = new URLSearchParams({
+      track:  track.name || "",
+      artist: (track.artists || []).map(a => a.name).join(", "),
+    });
+    if (track.album?.name)    params.set("album",    track.album.name);
+    if (track.duration_ms)    params.set("duration", String(Math.round(track.duration_ms / 1000)));
+
+    const r = await fetch(`/auth/spotify/lyrics/${track.id}?${params}`);
+    if (r.status === 404) {
+      // Race-protect: only clear if user hasn't already skipped to another track.
+      if (track.id === this.currentTrack?.id) {
+        this.lyrics = null;
+        this._lyricsTrackId = track.id;
+        this.onLyricsLoad?.(null);
+      }
+      return;
+    }
+    if (!r.ok) throw new Error(`${r.status} lyrics fetch failed`);
+    const data = await r.json();
+    if (track.id !== this.currentTrack?.id) return;     // user skipped mid-fetch
+    const synced = data?.syncedLyrics ? parseLrc(data.syncedLyrics) : null;
+    if (!synced || synced.length === 0) {
+      this.lyrics = null;
+      this._lyricsTrackId = track.id;
+      this.onLyricsLoad?.(null);
+      return;
+    }
+    this.lyrics           = synced;
+    this._lyricsTrackId   = track.id;
+    this._currentLyricIdx = -1;
+    this.onLyricsLoad?.(synced);
   }
 
   async _fetchFeatures(spotifyId) {
@@ -236,3 +327,28 @@ export class SpotifyWatcher {
 
 const ZERO_BANDS = { bass: 0, mid: 0, treble: 0 };
 function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+
+// Minimal LRC parser. Each non-metadata line has one or more timestamps:
+//   [mm:ss.xx] text
+//   [mm:ss.xx][mm:ss.xx] text   (same text repeated at multiple times)
+// Pure-metadata lines like [ar:Artist], [ti:Title], [length:03:42] have a
+// non-numeric tag and get skipped by the regex.
+function parseLrc(lrc) {
+  const out = [];
+  const tsRe = /\[(\d+):(\d+(?:\.\d+)?)\]/g;
+  for (const raw of lrc.split(/\r?\n/)) {
+    tsRe.lastIndex = 0;
+    const stamps = [];
+    let last = 0;
+    let m;
+    while ((m = tsRe.exec(raw)) !== null) {
+      stamps.push((+m[1]) * 60_000 + (+m[2]) * 1_000);
+      last = tsRe.lastIndex;
+    }
+    if (!stamps.length) continue;
+    const text = raw.slice(last).trim();
+    for (const ms of stamps) out.push({ ms, text });
+  }
+  out.sort((a, b) => a.ms - b.ms);
+  return out;
+}

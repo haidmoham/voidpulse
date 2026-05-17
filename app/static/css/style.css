@@ -1734,6 +1734,55 @@ body::after {
   transition: opacity 0.6s ease, transform 0.35s ease;
 }
 
+/* ─── synced lyrics overlay ──────────────────────────────────────────
+   Floats above the source picker, centered. Each line fades + drifts
+   upward as it swaps. Neon cyan with synthwave glow; magenta accent
+   underline echoes the rest of the chrome.
+   ──────────────────────────────────────────────────────────────────── */
+#lyrics {
+  position: fixed;
+  left: 50%;
+  bottom: 210px;
+  transform: translateX(-50%);
+  width: min(960px, 86vw);
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  z-index: 4;
+}
+#lyrics.lyrics-visible {
+  opacity: 1;
+}
+#lyrics .lyric-line {
+  font-family: "Orbitron", "Share Tech Mono", monospace;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.35;
+  color: var(--neon-cyan, #00f0ff);
+  text-shadow:
+    0 0 8px  rgba(0, 240, 255, 0.55),
+    0 0 18px rgba(0, 240, 255, 0.35),
+    0 0 36px rgba(255, 61, 240, 0.15);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.28s ease, transform 0.28s ease;
+  /* Soft pink underline rule echoes the now-playing card border. */
+  display: inline-block;
+  padding: 6px 18px 8px;
+  background: linear-gradient(180deg, transparent 0%, transparent 78%, rgba(255, 61, 240, 0.18) 100%);
+}
+#lyrics .lyric-line.lyric-show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Hide on mobile (already crowded) and in stream/OBS mode. */
+.is-phone #lyrics            { display: none !important; }
+body.stream-mode #lyrics     { display: none !important; }
+/* In UI-hidden mode lyrics are content, not chrome — keep them visible. */
+
 /* ─── UI hide mode ───────────────────────────────────────────────────
    body.ui-hidden collapses everything except #header-card + #lower-left.
    The hide button sits in the lower-left row so it's always reachable.
