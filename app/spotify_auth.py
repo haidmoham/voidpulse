@@ -254,17 +254,40 @@ RECCOBEATS_BASE = "https://api.reccobeats.com/v1"
 # User-Agent + to cache misses so we don't re-hit LRCLIB for every poll
 # on an unindexed track.
 
-LRCLIB_API   = "https://lrclib.net/api/get"
-_LYRICS_TTL  = 24 * 3600
-_LYRICS_MAX  = 256
+LRCLIB_API     = "https://lrclib.net/api/get"
+LRCLIB_SEARCH  = "https://lrclib.net/api/search"
+LRCLIB_UA      = "Voidpulse Visualizer (https://github.com/haidmoham/voidpulse)"
+_LYRICS_TTL    = 24 * 3600
+_LYRICS_MAX    = 256
 _lyrics_cache: dict = {}   # spotify_id → (json_or_None, fetched_at)
+
+
+def _pick_lrclib_match(results, target_duration):
+    """Pick the best /api/search result. Prefers entries with syncedLyrics
+    (the only kind the frontend can render), then by duration proximity to
+    target_duration (seconds). Returns None if results is empty."""
+    if not results:
+        return None
+    synced = [r for r in results if r.get("syncedLyrics")]
+    pool = synced or results
+    if target_duration:
+        return min(pool, key=lambda r: abs((r.get("duration") or 0) - target_duration))
+    return pool[0]
 
 
 @spotify_bp.route("/lyrics/<spotify_id>")
 def lyrics(spotify_id: str):
     """Return LRCLIB lyrics data for a Spotify track id. Query params:
     track, artist (required); album, duration (recommended for accuracy).
-    Cached for 24h per spotify_id; 404 misses are cached too."""
+    Cached for 24h per spotify_id; 404 misses are cached too.
+
+    LRCLIB's /api/get requires an exact match on track + artist + album +
+    duration (±2s tolerance). Real-world Spotify metadata diverges from
+    LRCLIB's index often enough — "(Deluxe Edition)" album suffixes, feat.
+    artist formatting, slightly different mastering durations — that strict
+    lookups silently fail per-song. On 404 we fall back to /api/search
+    (track + artist only, fuzzy) and pick the closest synced match by
+    duration."""
     if not spotify_id.isalnum() or len(spotify_id) > 32:
         return jsonify({"error": "invalid_id"}), 400
 
@@ -287,13 +310,9 @@ def lyrics(spotify_id: str):
     if album:    params["album_name"] = album
     if duration: params["duration"]   = duration
 
+    headers = {"User-Agent": LRCLIB_UA}
     try:
-        r = requests.get(
-            LRCLIB_API,
-            params=params,
-            headers={"User-Agent": "Voidpulse Visualizer (https://github.com/haidmoham/voidpulse)"},
-            timeout=6,
-        )
+        r = requests.get(LRCLIB_API, params=params, headers=headers, timeout=6)
     except requests.RequestException as e:
         return jsonify({"error": "lrclib_unreachable", "detail": str(e)}), 502
 
@@ -303,6 +322,30 @@ def lyrics(spotify_id: str):
         _lyrics_cache.pop(oldest_key, None)
 
     if r.status_code == 404:
+        # Fuzzy fallback. Use only track + artist so album/duration mismatches
+        # don't filter out otherwise-good matches; we re-rank by duration below.
+        try:
+            sr = requests.get(
+                LRCLIB_SEARCH,
+                params={"track_name": track, "artist_name": artist},
+                headers=headers,
+                timeout=6,
+            )
+        except requests.RequestException:
+            sr = None
+        if sr is not None and sr.ok:
+            try:
+                results = sr.json() or []
+            except ValueError:
+                results = []
+            target = None
+            if duration:
+                try: target = int(duration)
+                except ValueError: target = None
+            best = _pick_lrclib_match(results, target)
+            if best:
+                _lyrics_cache[spotify_id] = (best, now)
+                return jsonify(best)
         _lyrics_cache[spotify_id] = (None, now)
         return jsonify({"error": "not_found"}), 404
     if not r.ok:
