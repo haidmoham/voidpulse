@@ -81,7 +81,12 @@ const vertexShader = /* glsl */ `
   uniform vec3  uAttrPos1;
   uniform vec3  uAttrPos2;
   uniform vec3  uAttrPos3;
-  uniform float uAttrCount;  // active well count (0–4)
+  uniform vec3  uAttrPos4;
+  uniform vec3  uAttrPos5;
+  uniform vec3  uAttrPos6;
+  uniform vec3  uAttrPos7;
+  uniform vec3  uAttrPos8;
+  uniform float uAttrCount;  // active well count (0–9)
   uniform float uAttrStr;    // global pull strength
   attribute float aSize;
   attribute float aLayer;        // 0 = inner shell, 1 = outer shell
@@ -159,6 +164,11 @@ const vertexShader = /* glsl */ `
     if (uAttrCount > 1.5) pos += attrPull(uAttrPos1, pos);
     if (uAttrCount > 2.5) pos += attrPull(uAttrPos2, pos);
     if (uAttrCount > 3.5) pos += attrPull(uAttrPos3, pos);
+    if (uAttrCount > 4.5) pos += attrPull(uAttrPos4, pos);
+    if (uAttrCount > 5.5) pos += attrPull(uAttrPos5, pos);
+    if (uAttrCount > 6.5) pos += attrPull(uAttrPos6, pos);
+    if (uAttrCount > 7.5) pos += attrPull(uAttrPos7, pos);
+    if (uAttrCount > 8.5) pos += attrPull(uAttrPos8, pos);
 
 
     // Scatter — each particle flies to its own random chaos position, then reforms
@@ -247,12 +257,17 @@ export class Visualizer {
     // Attractor gravity wells — orbit the cloud, driven by audio.
     // angSpeed is relative: positive = CCW when viewed from above, negative = CW.
     this._attrs = [
-      { angle: 0,               elev:  0.28, angSpeed:  1.00 },
-      { angle: Math.PI,         elev: -0.22, angSpeed: -0.70 },
-      { angle: Math.PI / 2,     elev:  0.40, angSpeed:  0.55 },
-      { angle: 3 * Math.PI / 2, elev: -0.38, angSpeed: -0.90 },
+      { angle: 0,                       elev:  0.28, angSpeed:  1.00 },
+      { angle: Math.PI,                 elev: -0.22, angSpeed: -0.70 },
+      { angle: Math.PI / 2,             elev:  0.40, angSpeed:  0.55 },
+      { angle: 3 * Math.PI / 2,         elev: -0.38, angSpeed: -0.90 },
+      { angle: Math.PI / 4,             elev:  0.18, angSpeed:  0.80 },
+      { angle: 5 * Math.PI / 4,         elev: -0.30, angSpeed: -0.60 },
+      { angle: 3 * Math.PI / 4,         elev:  0.35, angSpeed:  0.45 },
+      { angle: 7 * Math.PI / 4,         elev: -0.15, angSpeed: -1.10 },
+      { angle: Math.PI / 6,             elev:  0.22, angSpeed:  0.70 },
     ];
-    this.cAttrCount  = 2;   // active wells (0–4); tuning panel "count" slider
+    this.cAttrCount  = 2;   // active wells (0–9); tuning panel "count" slider
     this.cAttrRadius = 55;  // orbit radius; tuning panel "orbit radius" slider
 
     // Shape transition state — driven by setShape(). uShapeMix lerps to
@@ -678,6 +693,11 @@ export class Visualizer {
         uAttrPos1:  { value: new THREE.Vector3(-55,  0,  0) },
         uAttrPos2:  { value: new THREE.Vector3(  0,  0, 55) },
         uAttrPos3:  { value: new THREE.Vector3(  0,  0,-55) },
+        uAttrPos4:  { value: new THREE.Vector3( 39,  0, 39) },
+        uAttrPos5:  { value: new THREE.Vector3(-39,  0,-39) },
+        uAttrPos6:  { value: new THREE.Vector3(-39,  0, 39) },
+        uAttrPos7:  { value: new THREE.Vector3( 39,  0,-39) },
+        uAttrPos8:  { value: new THREE.Vector3(  0, 20,  0) },
         uAttrCount: { value: 2 },
         uAttrStr:   { value: 7.5 },
       },
@@ -699,7 +719,10 @@ export class Visualizer {
     // Mid drives orbit speed; bass expands the orbit radius momentarily.
     const speed = 0.06 + bands.mid * 0.22;
     const r     = this.cAttrRadius * (0.85 + bands.bass * 0.32);
-    const pos   = [u.uAttrPos0, u.uAttrPos1, u.uAttrPos2, u.uAttrPos3];
+    const pos = [
+      u.uAttrPos0, u.uAttrPos1, u.uAttrPos2, u.uAttrPos3,
+      u.uAttrPos4, u.uAttrPos5, u.uAttrPos6, u.uAttrPos7, u.uAttrPos8,
+    ];
 
     this._attrs.forEach((a, i) => {
       a.angle += speed * a.angSpeed * dt;
@@ -713,7 +736,7 @@ export class Visualizer {
       );
     });
 
-    u.uAttrCount.value = Math.min(4, Math.max(0, Math.round(this.cAttrCount)));
+    u.uAttrCount.value = Math.min(9, Math.max(0, Math.round(this.cAttrCount)));
   }
 
   // ── Colours ──────────────────────────────────────────────────────────────

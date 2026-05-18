@@ -891,7 +891,7 @@ const PRESETS = {
       bStrength: 0.38, bRadius: 0.42, bThreshold: 0.55,
       eCycleSpeed: 0.00, eBassHue: 0.05, eTrebleHue: 0.03, eSatReact: 0.15, eBurstHue: 0.12,
       eInnerHue: 0.78, eOuterHue: 0.82,
-      cAttrCount: 3, uAttrStr: 22.0, cAttrRadius: 30,
+      cAttrCount: 9, uAttrStr: 22.0, cAttrRadius: 30,
       uFlowStrength: 2.40,
     },
     stereo: { uStereoParticles: 0, fStereoFloor: 0, eStereoColor: 0 },
