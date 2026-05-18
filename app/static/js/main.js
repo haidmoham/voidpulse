@@ -699,7 +699,7 @@ const tuningRandom = document.getElementById("tuning-random");
 tuningRandom.addEventListener("click", () => {
   document.querySelectorAll("#tuning-panel input[type=range]").forEach(randomizeSlider);
   randomizeSlider(sensSlider);
-  const palettes = ["synthwave", "inferno", "arctic", "toxic", "void", "ember", "nebula"];
+  const palettes = ["synthwave", "inferno", "arctic", "toxic", "void", "ember", "blackhole"];
   applyPalette(palettes[Math.floor(Math.random() * palettes.length)]);
   const shapes = ["sphere", "heart", "torus", "galaxy", "cube", "helix"];
   applyShape(shapes[Math.floor(Math.random() * shapes.length)]);
@@ -1006,7 +1006,7 @@ const PALETTES = {
   // Black hole — deep purple accretion ring, black center. Pinned to purple
   // (no hue drift), tight bloom so only the dense ring edge glows. Fast spin,
   // high turbulence. Pairs with the nebula preset.
-  nebula: {
+  blackhole: {
     eInnerHue: 0.78, eOuterHue: 0.82,
     eCycleSpeed: 0.00, eBassHue: 0.05, eTrebleHue: 0.03, eSatReact: 0.15, eBurstHue: 0.12,
     bStrength: 0.38, bRadius: 0.42, bThreshold: 0.55,
