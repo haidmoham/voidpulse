@@ -26,6 +26,9 @@ const errorToast = document.getElementById("error-toast");
 const volSlider   = document.getElementById("vol-slider");
 const sensSlider  = document.getElementById("sens-slider");
 const wellsSlider = document.getElementById("wells-slider");
+const volNum      = document.getElementById("vol-num");
+const sensNum     = document.getElementById("sens-num");
+const wellsNum    = document.getElementById("wells-num");
 const volRow      = document.getElementById("vol-row");
 const castBtn          = document.getElementById("cast-btn");
 const castTooltip      = document.getElementById("cast-tooltip");
@@ -1208,8 +1211,17 @@ const SENS_KEY = "voidpulse.sensitivity.v2"; // v2: stores raw 0–1 position, n
 const savedVol = parseFloat(localStorage.getItem(VOL_KEY));
 if (!isNaN(savedVol)) { volSlider.value = savedVol; }
 audio.setVolume(parseFloat(volSlider.value));
+volNum.value = parseFloat(volSlider.value).toFixed(2);
 volSlider.addEventListener("input", () => {
   const v = parseFloat(volSlider.value);
+  audio.setVolume(v);
+  localStorage.setItem(VOL_KEY, v);
+  volNum.value = v.toFixed(2);
+});
+volNum.addEventListener("change", () => {
+  const v = Math.max(0, Math.min(1, parseFloat(volNum.value) || 0));
+  volNum.value = v.toFixed(2);
+  volSlider.value = v;
   audio.setVolume(v);
   localStorage.setItem(VOL_KEY, v);
 });
@@ -1217,8 +1229,17 @@ volSlider.addEventListener("input", () => {
 const savedSens = parseFloat(localStorage.getItem(SENS_KEY));
 if (!isNaN(savedSens)) { sensSlider.value = savedSens; }
 audio.setSensitivity(sensTform(parseFloat(sensSlider.value)));
+sensNum.value = parseFloat(sensSlider.value).toFixed(2);
 sensSlider.addEventListener("input", () => {
   const raw = parseFloat(sensSlider.value);
+  audio.setSensitivity(sensTform(raw));
+  localStorage.setItem(SENS_KEY, raw);
+  sensNum.value = raw.toFixed(2);
+});
+sensNum.addEventListener("change", () => {
+  const raw = Math.max(0, Math.min(1, parseFloat(sensNum.value) || 0));
+  sensNum.value = raw.toFixed(2);
+  sensSlider.value = raw;
   audio.setSensitivity(sensTform(raw));
   localStorage.setItem(SENS_KEY, raw);
 });
@@ -1228,14 +1249,18 @@ const volLabel  = document.getElementById("vol-label");
 const sensLabel = document.getElementById("sens-label");
 
 volLabel.addEventListener("click", () => {
-  volSlider.value = volSlider.defaultValue;
-  audio.setVolume(parseFloat(volSlider.defaultValue));
+  const def = parseFloat(volSlider.defaultValue);
+  volSlider.value = def;
+  volNum.value    = def.toFixed(2);
+  audio.setVolume(def);
   localStorage.removeItem(VOL_KEY);
 });
 
 sensLabel.addEventListener("click", () => {
-  sensSlider.value = sensSlider.defaultValue;
-  audio.setSensitivity(sensTform(parseFloat(sensSlider.defaultValue)));
+  const def = parseFloat(sensSlider.defaultValue);
+  sensSlider.value = def;
+  sensNum.value    = def.toFixed(2);
+  audio.setSensitivity(sensTform(def));
   localStorage.removeItem(SENS_KEY);
 });
 
@@ -1245,12 +1270,26 @@ const wellsLabel       = document.getElementById("wells-label");
 const tuningAttrCount  = document.querySelector('#tuning-panel input[data-uniform="cAttrCount"]');
 
 function syncWellsSlider(v) {
-  wellsSlider.value = v;
+  const n = parseInt(v, 10);
+  wellsSlider.value = n;
+  wellsNum.value    = n;
 }
 
 wellsSlider.addEventListener("input", () => {
   const v = parseInt(wellsSlider.value, 10);
-  // Drive through the tuning panel slider so savedTuning + localStorage stay consistent.
+  wellsNum.value = v;
+  if (tuningAttrCount) {
+    tuningAttrCount.value = v;
+    tuningAttrCount.dispatchEvent(new Event("input"));
+  } else {
+    viz.setTuning("cAttrCount", v);
+  }
+});
+
+wellsNum.addEventListener("change", () => {
+  const v = Math.max(0, Math.min(24, parseInt(wellsNum.value, 10) || 0));
+  wellsNum.value    = v;
+  wellsSlider.value = v;
   if (tuningAttrCount) {
     tuningAttrCount.value = v;
     tuningAttrCount.dispatchEvent(new Event("input"));
@@ -1261,7 +1300,7 @@ wellsSlider.addEventListener("input", () => {
 
 wellsLabel.addEventListener("click", () => {
   const def = parseInt(wellsSlider.defaultValue, 10);
-  wellsSlider.value = def;
+  syncWellsSlider(def);
   if (tuningAttrCount) {
     tuningAttrCount.value = def;
     tuningAttrCount.dispatchEvent(new Event("input"));
