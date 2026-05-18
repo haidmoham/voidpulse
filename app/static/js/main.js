@@ -610,7 +610,7 @@ function frame() {
 
 // Tuning panel: sliders write directly to shader uniforms, values persist
 // across reloads via localStorage so a good config survives a refresh.
-const TUNING_KEY = "voidpulse.tuning.v9";
+const TUNING_KEY = "voidpulse.tuning.v10";
 const savedTuning = JSON.parse(localStorage.getItem(TUNING_KEY) || "{}");
 
 // If a slider has data-exponent="N", the raw slider value is raised to the
@@ -787,7 +787,7 @@ tuningReset.addEventListener("click", () => {
 // ── Stereo toggles ────────────────────────────────────────────────────────
 // Three independent on/off switches for particle hemisphere split, floor
 // channel split, and color divergence. Persist across reloads.
-const STEREO_KEY = "voidpulse.stereo.v1";
+const STEREO_KEY = "voidpulse.stereo.v2";
 const savedStereo = JSON.parse(localStorage.getItem(STEREO_KEY) || "{}");
 
 // Push a single stereo toggle to its visual + viz state. Doesn't persist —
@@ -894,7 +894,7 @@ const PRESETS = {
       cAttrCount: 9, uAttrStr: 22.0, cAttrRadius: 30,
       uFlowStrength: 2.40,
     },
-    stereo: { uStereoParticles: 0, fStereoFloor: 0, eStereoColor: 0 },
+    stereo: { uStereoParticles: 1, fStereoFloor: 1, eStereoColor: 1 },
   },
   storm: {
     shape: "torus",
@@ -1187,6 +1187,9 @@ shareBtn.addEventListener("click", () => {
 });
 
 window.addEventListener("hashchange", loadFromHash);
+// On a fresh load (new tuning key version, no saved state) apply nebula as the
+// default. loadFromHash() runs after so a URL hash can still override.
+if (Object.keys(savedTuning).length === 0) applyPreset("nebula");
 // Run after localStorage tuning/stereo init so hash takes precedence.
 loadFromHash();
 
