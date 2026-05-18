@@ -699,7 +699,7 @@ const tuningRandom = document.getElementById("tuning-random");
 tuningRandom.addEventListener("click", () => {
   document.querySelectorAll("#tuning-panel input[type=range]").forEach(randomizeSlider);
   randomizeSlider(sensSlider);
-  const palettes = ["synthwave", "inferno", "arctic", "toxic", "void", "ember"];
+  const palettes = ["synthwave", "inferno", "arctic", "toxic", "void", "ember", "nebula"];
   applyPalette(palettes[Math.floor(Math.random() * palettes.length)]);
   const shapes = ["sphere", "heart", "torus", "galaxy", "cube", "helix"];
   applyShape(shapes[Math.floor(Math.random() * shapes.length)]);
@@ -878,17 +878,19 @@ const PRESETS = {
   },
   nebula: {
     shape: "galaxy",
-    // Dreamy soft-glow cloud on a flat spiral disk: gentle breathe, slow
-    // rotation, low floor, high bloom, stereo color split for cyan/pink
-    // hemisphere tint across the spiral arms.
+    // 4 gravity wells cranked to max — rips the galaxy disk into 4 glowing
+    // clusters that billow and reform. Deep purple + violet palette, diffuse
+    // bloom, slow spin, high flow so the clouds breathe like gas nebulae.
     sliders: {
-      uBreatheMin: 0.55, uBreatheMax: 1.80, uBreatheCurve: 1.40,
-      uSizeMin:    0.35, uSizeMax:    2.00, uSizeCurve:    1.50,
-      cBurstInterval: 3.5, cRotateSpeed: 0.04,
-      fMaxH: 8, fScroll: 1.5, fScrollBass: 6, fDecay: 0.92, fHotCurve: 2.0,
-      bStrength: 0.50, bRadius: 0.55, bThreshold: 0.35,
-      eCycleSpeed: 0.04, eBassHue: 0.30, eTrebleHue: 0.20, eSatReact: 0.50, eBurstHue: 0.25,
-      cAttrCount: 1, uAttrStr: 4.5, cAttrRadius: 80,
+      uBreatheMin: 0.60, uBreatheMax: 1.80, uBreatheCurve: 1.20,
+      uSizeMin:    0.38, uSizeMax:    1.80, uSizeCurve:    1.60,
+      cBurstInterval: 4.0, cRotateSpeed: 0.04,
+      fMaxH: 6, fScroll: 1.5, fScrollBass: 6, fDecay: 0.92, fHotCurve: 2.0,
+      bStrength: 0.58, bRadius: 0.65, bThreshold: 0.28,
+      eCycleSpeed: 0.00, eBassHue: 0.06, eTrebleHue: 0.04, eSatReact: 0.20, eBurstHue: 0.18,
+      eInnerHue: 0.78, eOuterHue: 0.83,
+      cAttrCount: 4, uAttrStr: 35.0, cAttrRadius: 62,
+      uFlowStrength: 1.10,
     },
     stereo: { uStereoParticles: 0, fStereoFloor: 0, eStereoColor: 1 },
   },
@@ -998,6 +1000,17 @@ const PALETTES = {
     uSizeMin: 0.42, uSizeMax: 1.95, uSizeCurve: 2.00,
     cRotateSpeed: 0.06, uFlowStrength: 0.50,
     uBreatheMin: 0.65, uBreatheMax: 1.55, cBurstInterval: 5.0,
+  },
+  // Deep space nebula — black field, purple/violet glow. Identity = pinned to
+  // purple (no hue drift, minimal reactivity), wide diffuse bloom so even dim
+  // particles bleed light. Pairs naturally with the nebula preset (4 wells).
+  nebula: {
+    eInnerHue: 0.78, eOuterHue: 0.83,
+    eCycleSpeed: 0.00, eBassHue: 0.06, eTrebleHue: 0.04, eSatReact: 0.20, eBurstHue: 0.18,
+    bStrength: 0.58, bRadius: 0.65, bThreshold: 0.28,
+    uSizeMin: 0.38, uSizeMax: 1.80, uSizeCurve: 1.60,
+    cRotateSpeed: 0.04, uFlowStrength: 1.10,
+    uBreatheMin: 0.60, uBreatheMax: 1.50,
   },
 };
 
