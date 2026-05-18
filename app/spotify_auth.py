@@ -45,7 +45,17 @@ def _client_creds():
 
 
 def _redirect_uri():
-    return current_app.config.get("SPOTIFY_REDIRECT_URI", "")
+    # Derive from the current request so one Spotify app can serve production,
+    # staging, and any preview environment without per-env config. The Spotify
+    # dashboard's allowlist is the source of truth for which hostnames are
+    # accepted. Falls back to the configured env var only outside of a request
+    # context (won't happen during OAuth, but keeps the helper safe to call).
+    # Railway terminates TLS at the proxy, so trust X-Forwarded-Proto first.
+    try:
+        scheme = request.headers.get("X-Forwarded-Proto") or request.scheme
+        return f"{scheme}://{request.host}/auth/spotify/callback"
+    except RuntimeError:
+        return current_app.config.get("SPOTIFY_REDIRECT_URI", "")
 
 
 @spotify_bp.route("/login")
