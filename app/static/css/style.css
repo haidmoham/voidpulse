@@ -1258,7 +1258,7 @@ body::after {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
+  gap: 10px;
   pointer-events: auto;
   z-index: 11;
 }
@@ -1267,17 +1267,17 @@ body::after {
 #zoom-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
 }
 
 #zoom-controls {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   background: rgba(10, 0, 30, 0.7);
   border: 1px solid rgba(0, 240, 255, 0.25);
   border-radius: 4px;
-  padding: 6px 10px;
+  padding: 8px 14px;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   box-shadow: 0 0 18px rgba(0, 240, 255, 0.08);
@@ -1309,15 +1309,15 @@ body::after {
 .zoom-step {
   appearance: none;
   cursor: pointer;
-  width: 24px;
-  height: 22px;
+  width: 28px;
+  height: 26px;
   background: rgba(0, 240, 255, 0.05);
   border: 1px solid rgba(0, 240, 255, 0.3);
   border-radius: 2px;
   color: var(--neon-cyan);
   font-family: "Orbitron", monospace;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1;
   padding: 0;
   display: inline-flex;
@@ -1932,7 +1932,7 @@ body.ui-hidden #spotify-tooltip {
   font-size: 9px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  padding: 6px 10px;
+  padding: 8px 14px;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   box-shadow: 0 0 18px rgba(0, 240, 255, 0.04);
