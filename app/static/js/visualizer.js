@@ -77,16 +77,8 @@ const vertexShader = /* glsl */ `
   uniform float uShapeMix;
   uniform float uFlowStrength;   // tuning panel multiplier for flow amplitude
   // Audio-reactive gravity wells — particles drift toward each active point.
-  uniform vec3  uAttrPos0;
-  uniform vec3  uAttrPos1;
-  uniform vec3  uAttrPos2;
-  uniform vec3  uAttrPos3;
-  uniform vec3  uAttrPos4;
-  uniform vec3  uAttrPos5;
-  uniform vec3  uAttrPos6;
-  uniform vec3  uAttrPos7;
-  uniform vec3  uAttrPos8;
-  uniform float uAttrCount;  // active well count (0–9)
+  uniform vec3  uAttrPos[24];
+  uniform float uAttrCount;  // active well count (0–24)
   uniform float uAttrStr;    // global pull strength
   attribute float aSize;
   attribute float aLayer;        // 0 = inner shell, 1 = outer shell
@@ -160,15 +152,10 @@ const vertexShader = /* glsl */ `
 
     // Gravity wells — pull particles toward each active attractor.
     // Applied before scatter so the cloud "remembers" well positions as it reforms.
-    if (uAttrCount > 0.5) pos += attrPull(uAttrPos0, pos);
-    if (uAttrCount > 1.5) pos += attrPull(uAttrPos1, pos);
-    if (uAttrCount > 2.5) pos += attrPull(uAttrPos2, pos);
-    if (uAttrCount > 3.5) pos += attrPull(uAttrPos3, pos);
-    if (uAttrCount > 4.5) pos += attrPull(uAttrPos4, pos);
-    if (uAttrCount > 5.5) pos += attrPull(uAttrPos5, pos);
-    if (uAttrCount > 6.5) pos += attrPull(uAttrPos6, pos);
-    if (uAttrCount > 7.5) pos += attrPull(uAttrPos7, pos);
-    if (uAttrCount > 8.5) pos += attrPull(uAttrPos8, pos);
+    for (int i = 0; i < 24; i++) {
+      if (float(i) >= uAttrCount) break;
+      pos += attrPull(uAttrPos[i], pos);
+    }
 
 
     // Scatter — each particle flies to its own random chaos position, then reforms
@@ -256,18 +243,13 @@ export class Visualizer {
 
     // Attractor gravity wells — orbit the cloud, driven by audio.
     // angSpeed is relative: positive = CCW when viewed from above, negative = CW.
-    this._attrs = [
-      { angle: 0,                       elev:  0.28, angSpeed:  1.00 },
-      { angle: Math.PI,                 elev: -0.22, angSpeed: -0.70 },
-      { angle: Math.PI / 2,             elev:  0.40, angSpeed:  0.55 },
-      { angle: 3 * Math.PI / 2,         elev: -0.38, angSpeed: -0.90 },
-      { angle: Math.PI / 4,             elev:  0.18, angSpeed:  0.80 },
-      { angle: 5 * Math.PI / 4,         elev: -0.30, angSpeed: -0.60 },
-      { angle: 3 * Math.PI / 4,         elev:  0.35, angSpeed:  0.45 },
-      { angle: 7 * Math.PI / 4,         elev: -0.15, angSpeed: -1.10 },
-      { angle: Math.PI / 6,             elev:  0.22, angSpeed:  0.70 },
-    ];
-    this.cAttrCount  = 2;   // active wells (0–9); tuning panel "count" slider
+    // 24 slots evenly distributed, alternating elevation sign + varied speeds.
+    this._attrs = Array.from({ length: 24 }, (_, i) => ({
+      angle:    (i * Math.PI * 2) / 24,
+      elev:     (i % 2 === 0 ? 1 : -1) * (0.12 + (i % 7) * 0.045),
+      angSpeed: (i % 2 === 0 ? 1 : -1) * (0.40 + (i % 9) * 0.085),
+    }));
+    this.cAttrCount  = 2;   // active wells (0–24); tuning panel "count" slider
     this.cAttrRadius = 55;  // orbit radius; tuning panel "orbit radius" slider
 
     // Shape transition state — driven by setShape(). uShapeMix lerps to
@@ -689,15 +671,7 @@ export class Visualizer {
         uSizeCurve:    { value: 2.65 },
         uShapeMix:     { value: 0 },      // driven by setShape() transition system
         uFlowStrength: { value: 1.0  },   // curl-noise amplitude multiplier
-        uAttrPos0:  { value: new THREE.Vector3( 55,  0,  0) },
-        uAttrPos1:  { value: new THREE.Vector3(-55,  0,  0) },
-        uAttrPos2:  { value: new THREE.Vector3(  0,  0, 55) },
-        uAttrPos3:  { value: new THREE.Vector3(  0,  0,-55) },
-        uAttrPos4:  { value: new THREE.Vector3( 39,  0, 39) },
-        uAttrPos5:  { value: new THREE.Vector3(-39,  0,-39) },
-        uAttrPos6:  { value: new THREE.Vector3(-39,  0, 39) },
-        uAttrPos7:  { value: new THREE.Vector3( 39,  0,-39) },
-        uAttrPos8:  { value: new THREE.Vector3(  0, 20,  0) },
+        uAttrPos:   { value: Array.from({ length: 24 }, () => new THREE.Vector3()) },
         uAttrCount: { value: 2 },
         uAttrStr:   { value: 7.5 },
       },
@@ -719,24 +693,21 @@ export class Visualizer {
     // Mid drives orbit speed; bass expands the orbit radius momentarily.
     const speed = 0.06 + bands.mid * 0.22;
     const r     = this.cAttrRadius * (0.85 + bands.bass * 0.32);
-    const pos = [
-      u.uAttrPos0, u.uAttrPos1, u.uAttrPos2, u.uAttrPos3,
-      u.uAttrPos4, u.uAttrPos5, u.uAttrPos6, u.uAttrPos7, u.uAttrPos8,
-    ];
+    const arr = u.uAttrPos.value;
 
     this._attrs.forEach((a, i) => {
       a.angle += speed * a.angSpeed * dt;
       const cosE = Math.cos(a.elev);
       // Small vertical bob per attractor (different phase per index).
       const y = Math.sin(a.elev) * r * 0.45 + Math.sin(a.angle * 0.31 + i * 1.7) * 6;
-      pos[i].value.set(
+      arr[i].set(
         Math.cos(a.angle) * r * cosE,
         y,
         Math.sin(a.angle) * r * cosE,
       );
     });
 
-    u.uAttrCount.value = Math.min(9, Math.max(0, Math.round(this.cAttrCount)));
+    u.uAttrCount.value = Math.min(24, Math.max(0, Math.round(this.cAttrCount)));
   }
 
   // ── Colours ──────────────────────────────────────────────────────────────

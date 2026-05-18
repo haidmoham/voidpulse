@@ -25,6 +25,7 @@ const stopBtn = document.getElementById("stop-btn");
 const errorToast = document.getElementById("error-toast");
 const volSlider   = document.getElementById("vol-slider");
 const sensSlider  = document.getElementById("sens-slider");
+const wellsSlider = document.getElementById("wells-slider");
 const volRow      = document.getElementById("vol-row");
 const castBtn          = document.getElementById("cast-btn");
 const castTooltip      = document.getElementById("cast-tooltip");
@@ -1237,6 +1238,48 @@ sensLabel.addEventListener("click", () => {
   audio.setSensitivity(sensTform(parseFloat(sensSlider.defaultValue)));
   localStorage.removeItem(SENS_KEY);
 });
+
+// Wells slider — quick-access gravity well count, synced two-way with the
+// Advanced panel's cAttrCount slider so either control always agrees.
+const wellsLabel       = document.getElementById("wells-label");
+const tuningAttrCount  = document.querySelector('#tuning-panel input[data-uniform="cAttrCount"]');
+
+function syncWellsSlider(v) {
+  wellsSlider.value = v;
+}
+
+wellsSlider.addEventListener("input", () => {
+  const v = parseInt(wellsSlider.value, 10);
+  // Drive through the tuning panel slider so savedTuning + localStorage stay consistent.
+  if (tuningAttrCount) {
+    tuningAttrCount.value = v;
+    tuningAttrCount.dispatchEvent(new Event("input"));
+  } else {
+    viz.setTuning("cAttrCount", v);
+  }
+});
+
+wellsLabel.addEventListener("click", () => {
+  const def = parseInt(wellsSlider.defaultValue, 10);
+  wellsSlider.value = def;
+  if (tuningAttrCount) {
+    tuningAttrCount.value = def;
+    tuningAttrCount.dispatchEvent(new Event("input"));
+  } else {
+    viz.setTuning("cAttrCount", def);
+  }
+});
+
+// Keep wells slider in sync when the Advanced panel's cAttrCount slider is moved.
+if (tuningAttrCount) {
+  tuningAttrCount.addEventListener("input", () => {
+    syncWellsSlider(tuningAttrCount.value);
+  });
+  // Restore from savedTuning on load.
+  if (typeof savedTuning["cAttrCount"] === "number") {
+    syncWellsSlider(savedTuning["cAttrCount"]);
+  }
+}
 
 // Zoom controls — + and − step the camera Z in increments of ZOOM_STEP. The
 // visualizer lerps internally so each click eases in over ~0.5s. Percentage
