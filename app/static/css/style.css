@@ -750,19 +750,19 @@ body::after {
    off the row height. Each row's accent color is inherited via color. */
 .row-label {
   font-family: "Share Tech Mono", monospace;
-  font-size: 8px;
-  letter-spacing: 0.22em;
+  font-size: 9px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(246, 214, 255, 0.30);
+  color: rgba(246, 214, 255, 0.65);
   align-self: center;
   white-space: nowrap;
-  padding-right: 2px;
+  padding-right: 4px;
   pointer-events: none;
   user-select: none;
 }
-.tuning-presets  .row-label { color: rgba(  0, 240, 255, 0.30); }
-.tuning-palettes .row-label { color: rgba(255,  61, 240, 0.30); }
-.tuning-shapes   .row-label { color: rgba(165, 102, 255, 0.30); }
+.tuning-presets  .row-label { color: rgba(  0, 240, 255, 0.70); }
+.tuning-palettes .row-label { color: rgba(255,  61, 240, 0.70); }
+.tuning-shapes   .row-label { color: rgba(165, 102, 255, 0.70); }
 
 .tuning-presets {
   display: flex;
