@@ -1661,9 +1661,7 @@ body::after {
    #header-card but pink-accented to signal it's Spotify data.
    ──────────────────────────────────────────────────────────────────── */
 #now-playing {
-  position: fixed;
-  top: 176px;
-  left: 20px;
+  /* Flows inside #lower-left flex column — no fixed positioning needed. */
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1760,15 +1758,18 @@ body::after {
   font-weight: 700;
   letter-spacing: 0.08em;
   line-height: 1.35;
-  color: var(--neon-cyan, #00f0ff);
+  /* Color driven by JS via --lyric-color (complement of current outer palette hue).
+     Falls back to neon-cyan. Dark backstop shadows ensure legibility on any
+     preset, including bright inferno/toxic where a pure glow color would wash out. */
+  color: var(--lyric-color, var(--neon-cyan));
   text-shadow:
-    0 0 8px  rgba(0, 240, 255, 0.55),
-    0 0 18px rgba(0, 240, 255, 0.35),
-    0 0 36px rgba(255, 61, 240, 0.15);
+    0 0 8px  var(--lyric-glow, rgba(0, 240, 255, 0.55)),
+    0 0 20px var(--lyric-glow, rgba(0, 240, 255, 0.35)),
+    0 2px 10px rgba(0, 0, 0, 0.95),
+    0 0 28px  rgba(0, 0, 0, 0.7);
   opacity: 0;
   transform: translateY(10px);
   transition: opacity 0.28s ease, transform 0.28s ease;
-  /* Soft pink underline rule echoes the now-playing card border. */
   display: inline-block;
   padding: 6px 18px 8px;
   background: linear-gradient(180deg, transparent 0%, transparent 78%, rgba(255, 61, 240, 0.18) 100%);

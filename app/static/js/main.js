@@ -1016,6 +1016,20 @@ const PALETTES = {
   },
 };
 
+// Drive --lyric-color and --lyric-glow CSS variables from the current outer
+// palette hue so lyrics are always legible. Complement (hue + 0.5) maximises
+// hue distance from the visualization; forced to high lightness (88%) so it
+// reads on dark backgrounds. Dark text-shadow backstop in CSS handles
+// legibility against bright particle clusters.
+function updateLyricColor() {
+  const outerH = (viz.eOuterHue ?? 0.84) * 360;
+  const contrastH = ((viz.eOuterHue ?? 0.84) + 0.5) % 1.0 * 360;
+  document.documentElement.style.setProperty(
+    "--lyric-color", `hsl(${contrastH.toFixed(0)}, 100%, 88%)`);
+  document.documentElement.style.setProperty(
+    "--lyric-glow",  `hsla(${contrastH.toFixed(0)}, 100%, 70%, 0.55)`);
+}
+
 function applyPalette(name) {
   const p = PALETTES[name];
   if (!p) return;
@@ -1025,6 +1039,7 @@ function applyPalette(name) {
     input.value = value;
     input.dispatchEvent(new Event("input"));
   }
+  updateLyricColor();
 }
 
 document.querySelectorAll("#tuning-panel .palette-btn").forEach((btn) => {
@@ -1358,4 +1373,5 @@ if (IS_PHONE) {
 }
 
 refreshUi();
+updateLyricColor(); // set initial lyric color from default/restored palette
 requestAnimationFrame(frame);
