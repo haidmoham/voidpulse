@@ -877,22 +877,24 @@ const PRESETS = {
     stereo: { uStereoParticles: 0, fStereoFloor: 0, eStereoColor: 0 },
   },
   nebula: {
-    shape: "galaxy",
-    // 4 gravity wells cranked to max — rips the galaxy disk into 4 glowing
-    // clusters that billow and reform. Deep purple + violet palette, diffuse
-    // bloom, slow spin, high flow so the clouds breathe like gas nebulae.
+    shape: "torus",
+    // Black hole accretion disk. Torus ring = disk with naturally dark center
+    // (event horizon). 3 tight-orbit attractors inside the ring radius create
+    // dense gravitational streams. Fast spin + high turbulent flow simulate
+    // orbital dynamics. Bloom is controlled — ring edge glows purple, center
+    // stays black. Bass beats = tidal disruption bursts.
     sliders: {
-      uBreatheMin: 0.60, uBreatheMax: 1.80, uBreatheCurve: 1.20,
-      uSizeMin:    0.38, uSizeMax:    1.80, uSizeCurve:    1.60,
-      cBurstInterval: 4.0, cRotateSpeed: 0.04,
-      fMaxH: 6, fScroll: 1.5, fScrollBass: 6, fDecay: 0.92, fHotCurve: 2.0,
-      bStrength: 0.58, bRadius: 0.65, bThreshold: 0.28,
-      eCycleSpeed: 0.00, eBassHue: 0.06, eTrebleHue: 0.04, eSatReact: 0.20, eBurstHue: 0.18,
-      eInnerHue: 0.78, eOuterHue: 0.83,
-      cAttrCount: 4, uAttrStr: 35.0, cAttrRadius: 62,
-      uFlowStrength: 1.10,
+      uBreatheMin: 0.85, uBreatheMax: 1.35, uBreatheCurve: 0.55,
+      uSizeMin:    0.14, uSizeMax:    1.10, uSizeCurve:    3.00,
+      cBurstInterval: 2.5, cRotateSpeed: 0.52,
+      fMaxH: 4, fScroll: 1.0, fScrollBass: 4, fDecay: 0.95, fHotCurve: 3.5,
+      bStrength: 0.38, bRadius: 0.42, bThreshold: 0.55,
+      eCycleSpeed: 0.00, eBassHue: 0.05, eTrebleHue: 0.03, eSatReact: 0.15, eBurstHue: 0.12,
+      eInnerHue: 0.78, eOuterHue: 0.82,
+      cAttrCount: 3, uAttrStr: 22.0, cAttrRadius: 30,
+      uFlowStrength: 2.40,
     },
-    stereo: { uStereoParticles: 0, fStereoFloor: 0, eStereoColor: 1 },
+    stereo: { uStereoParticles: 0, fStereoFloor: 0, eStereoColor: 0 },
   },
   storm: {
     shape: "torus",
@@ -1001,16 +1003,16 @@ const PALETTES = {
     cRotateSpeed: 0.06, uFlowStrength: 0.50,
     uBreatheMin: 0.65, uBreatheMax: 1.55, cBurstInterval: 5.0,
   },
-  // Deep space nebula — black field, purple/violet glow. Identity = pinned to
-  // purple (no hue drift, minimal reactivity), wide diffuse bloom so even dim
-  // particles bleed light. Pairs naturally with the nebula preset (4 wells).
+  // Black hole — deep purple accretion ring, black center. Pinned to purple
+  // (no hue drift), tight bloom so only the dense ring edge glows. Fast spin,
+  // high turbulence. Pairs with the nebula preset.
   nebula: {
-    eInnerHue: 0.78, eOuterHue: 0.83,
-    eCycleSpeed: 0.00, eBassHue: 0.06, eTrebleHue: 0.04, eSatReact: 0.20, eBurstHue: 0.18,
-    bStrength: 0.58, bRadius: 0.65, bThreshold: 0.28,
-    uSizeMin: 0.38, uSizeMax: 1.80, uSizeCurve: 1.60,
-    cRotateSpeed: 0.04, uFlowStrength: 1.10,
-    uBreatheMin: 0.60, uBreatheMax: 1.50,
+    eInnerHue: 0.78, eOuterHue: 0.82,
+    eCycleSpeed: 0.00, eBassHue: 0.05, eTrebleHue: 0.03, eSatReact: 0.15, eBurstHue: 0.12,
+    bStrength: 0.38, bRadius: 0.42, bThreshold: 0.55,
+    uSizeMin: 0.14, uSizeMax: 1.10, uSizeCurve: 3.00,
+    cRotateSpeed: 0.52, uFlowStrength: 2.40,
+    uBreatheMin: 0.85, uBreatheMax: 1.35,
   },
 };
 
