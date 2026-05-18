@@ -885,9 +885,9 @@ const PRESETS = {
     // stays black. Bass beats = tidal disruption bursts.
     sliders: {
       uBreatheMin: 0.85, uBreatheMax: 1.35, uBreatheCurve: 0.55,
-      uSizeMin:    0.14, uSizeMax:    1.10, uSizeCurve:    3.00,
+      uSizeMin:    0.32, uSizeMax:    1.20, uSizeCurve:    2.60,
       cBurstInterval: 2.5, cRotateSpeed: 0.52,
-      fMaxH: 4, fScroll: 1.0, fScrollBass: 4, fDecay: 0.95, fHotCurve: 3.5,
+      fMaxH: 1, fScroll: 0.5, fScrollBass: 1, fDecay: 0.98, fHotCurve: 3.5,
       bStrength: 0.38, bRadius: 0.42, bThreshold: 0.55,
       eCycleSpeed: 0.00, eBassHue: 0.05, eTrebleHue: 0.03, eSatReact: 0.15, eBurstHue: 0.12,
       eInnerHue: 0.78, eOuterHue: 0.82,
