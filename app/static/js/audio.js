@@ -203,6 +203,30 @@ export class AudioEngine {
     this.label = file.name;
   }
 
+  /** Load a remote URL (e.g. Spotify preview CDN) as a file-equivalent source.
+   *  Same graph as loadFile; loops by default so short previews play forever. */
+  async loadUrl(url, label = "preview", { loop = true } = {}) {
+    this._ensureContext();
+    await this._teardownCurrent();
+    const audio = new Audio();
+    audio.crossOrigin = "anonymous";
+    audio.loop = loop;
+    audio.src  = url;
+    this.audio = audio;
+    this.source = this.ctx.createMediaElementSource(audio);
+    this._buildAnalyser();
+    const g = this.ctx.createGain();
+    g.gain.value = this._volume;
+    this.gainNode = g;
+    this.source.connect(this.analyser);
+    this.source.connect(this.splitter);
+    this.analyser.connect(this.gainNode);
+    this.gainNode.connect(this.ctx.destination);
+    if (this.ctx.state === "suspended") await this.ctx.resume();
+    this.mode  = "file";
+    this.label = label;
+  }
+
   setVolume(v) {
     this._volume = v;
     if (this.gainNode) this.gainNode.gain.value = v;

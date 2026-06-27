@@ -45,7 +45,17 @@ def _client_creds():
 
 
 def _redirect_uri():
-    return current_app.config.get("SPOTIFY_REDIRECT_URI", "")
+    # Derive from the current request so one Spotify app can serve production,
+    # staging, and any preview environment without per-env config. The Spotify
+    # dashboard's allowlist is the source of truth for which hostnames are
+    # accepted. Falls back to the configured env var only outside of a request
+    # context (won't happen during OAuth, but keeps the helper safe to call).
+    # Railway terminates TLS at the proxy, so trust X-Forwarded-Proto first.
+    try:
+        scheme = request.headers.get("X-Forwarded-Proto") or request.scheme
+        return f"{scheme}://{request.host}/auth/spotify/callback"
+    except RuntimeError:
+        return current_app.config.get("SPOTIFY_REDIRECT_URI", "")
 
 
 @spotify_bp.route("/login")
@@ -172,7 +182,181 @@ def logout():
 # → audio features. We proxy through Flask to avoid CORS and to keep the
 # chain on the backend so the frontend only sees one clean response.
 
+# ── Demo tracks ──────────────────────────────────────────────────────────────
+# Three 30-second preview snippets served to mobile visitors. Fetched via the
+# iTunes Search API (no auth required, always returns preview URLs) and cached
+# for 24h. Spotify's preview_url was deprecated for new apps post-2024.
+
+_demos_cache: dict = {}   # { tracks: [...], fetched_at: float }
+_DEMOS_TTL   = 86_400     # 24 hours
+
+_DEMO_SEARCHES = [
+    "Bloc Party This Modern Love",
+    "Balam Pichkari Shalmali Kholgade",
+    "Small Town Kid I Drift Out Then Return",
+]
+
+ITUNES_SEARCH = "https://itunes.apple.com/search"
+
+
+@spotify_bp.route("/demos")
+def demos():
+    """Return metadata + 30-second preview URLs for the three demo tracks.
+    Uses the iTunes Search API — no authentication required."""
+    import time as _time
+    now = _time.time()
+
+    if _demos_cache.get("fetched_at", 0) + _DEMOS_TTL > now:
+        return jsonify(_demos_cache["tracks"])
+
+    tracks = []
+    for query in _DEMO_SEARCHES:
+        try:
+            r = requests.get(
+                ITUNES_SEARCH,
+                params={"term": query, "entity": "song", "limit": 1, "country": "US"},
+                timeout=8,
+            )
+            if not r.ok:
+                continue
+            results = r.json().get("results", [])
+            if not results:
+                continue
+            item = results[0]
+            preview = item.get("previewUrl")
+            if not preview:
+                continue
+            # artworkUrl100 → swap to 300×300 for card display
+            art = item.get("artworkUrl100", "").replace("100x100", "300x300")
+            tracks.append({
+                "title":       item.get("trackName", ""),
+                "artist":      item.get("artistName", ""),
+                "preview_url": preview,
+                "art_url":     art,
+            })
+        except requests.RequestException:
+            continue
+
+    _demos_cache["tracks"]     = tracks
+    _demos_cache["fetched_at"] = now
+    return jsonify(tracks)
+
+
 RECCOBEATS_BASE = "https://api.reccobeats.com/v1"
+
+
+# ── LRCLIB synced lyrics proxy ──────────────────────────────────────
+# Spotify's official Web API doesn't expose lyrics (they're licensed
+# through Musixmatch for first-party clients only). LRCLIB
+# (https://lrclib.net) is a free, no-auth community lyrics database that
+# returns LRC-format synced lyrics ("[mm:ss.xx] line text") for most
+# popular tracks. We proxy through Flask for CORS + to attach a polite
+# User-Agent + to cache misses so we don't re-hit LRCLIB for every poll
+# on an unindexed track.
+
+LRCLIB_API     = "https://lrclib.net/api/get"
+LRCLIB_SEARCH  = "https://lrclib.net/api/search"
+LRCLIB_UA      = "Voidpulse Visualizer (https://github.com/haidmoham/voidpulse)"
+_LYRICS_TTL    = 24 * 3600
+_LYRICS_MAX    = 256
+_lyrics_cache: dict = {}   # spotify_id → (json_or_None, fetched_at)
+
+
+def _pick_lrclib_match(results, target_duration):
+    """Pick the best /api/search result. Prefers entries with syncedLyrics
+    (the only kind the frontend can render), then by duration proximity to
+    target_duration (seconds). Returns None if results is empty."""
+    if not results:
+        return None
+    synced = [r for r in results if r.get("syncedLyrics")]
+    pool = synced or results
+    if target_duration:
+        return min(pool, key=lambda r: abs((r.get("duration") or 0) - target_duration))
+    return pool[0]
+
+
+@spotify_bp.route("/lyrics/<spotify_id>")
+def lyrics(spotify_id: str):
+    """Return LRCLIB lyrics data for a Spotify track id. Query params:
+    track, artist (required); album, duration (recommended for accuracy).
+    Cached for 24h per spotify_id; 404 misses are cached too.
+
+    LRCLIB's /api/get requires an exact match on track + artist + album +
+    duration (±2s tolerance). Real-world Spotify metadata diverges from
+    LRCLIB's index often enough — "(Deluxe Edition)" album suffixes, feat.
+    artist formatting, slightly different mastering durations — that strict
+    lookups silently fail per-song. On 404 we fall back to /api/search
+    (track + artist only, fuzzy) and pick the closest synced match by
+    duration."""
+    if not spotify_id.isalnum() or len(spotify_id) > 32:
+        return jsonify({"error": "invalid_id"}), 400
+
+    now = time.time()
+    cached = _lyrics_cache.get(spotify_id)
+    if cached and now - cached[1] < _LYRICS_TTL:
+        body = cached[0]
+        if body is None:
+            return jsonify({"error": "not_found"}), 404
+        return jsonify(body)
+
+    track  = request.args.get("track",  "").strip()
+    artist = request.args.get("artist", "").strip()
+    if not track or not artist:
+        return jsonify({"error": "missing_track_or_artist"}), 400
+
+    params = {"track_name": track, "artist_name": artist}
+    album    = request.args.get("album", "").strip()
+    duration = request.args.get("duration", "").strip()
+    if album:    params["album_name"] = album
+    if duration: params["duration"]   = duration
+
+    headers = {"User-Agent": LRCLIB_UA}
+    try:
+        r = requests.get(LRCLIB_API, params=params, headers=headers, timeout=6)
+    except requests.RequestException as e:
+        return jsonify({"error": "lrclib_unreachable", "detail": str(e)}), 502
+
+    # Bound cache: evict oldest entry when full.
+    if len(_lyrics_cache) >= _LYRICS_MAX:
+        oldest_key = min(_lyrics_cache, key=lambda k: _lyrics_cache[k][1])
+        _lyrics_cache.pop(oldest_key, None)
+
+    if r.status_code == 404:
+        # Fuzzy fallback. Use only track + artist so album/duration mismatches
+        # don't filter out otherwise-good matches; we re-rank by duration below.
+        try:
+            sr = requests.get(
+                LRCLIB_SEARCH,
+                params={"track_name": track, "artist_name": artist},
+                headers=headers,
+                timeout=6,
+            )
+        except requests.RequestException:
+            sr = None
+        if sr is not None and sr.ok:
+            try:
+                results = sr.json() or []
+            except ValueError:
+                results = []
+            target = None
+            if duration:
+                try: target = int(duration)
+                except ValueError: target = None
+            best = _pick_lrclib_match(results, target)
+            if best:
+                _lyrics_cache[spotify_id] = (best, now)
+                return jsonify(best)
+        _lyrics_cache[spotify_id] = (None, now)
+        return jsonify({"error": "not_found"}), 404
+    if not r.ok:
+        return jsonify({"error": "lrclib_failed", "status": r.status_code}), 502
+
+    try:
+        data = r.json()
+    except ValueError:
+        return jsonify({"error": "lrclib_bad_response"}), 502
+    _lyrics_cache[spotify_id] = (data, now)
+    return jsonify(data)
 
 
 @spotify_bp.route("/features/<spotify_id>")

@@ -3,6 +3,7 @@ import { EffectComposer }  from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass }      from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass }      from "three/addons/postprocessing/OutputPass.js";
+import { OrbitControls }   from "three/addons/controls/OrbitControls.js";
 
 let PARTICLE_COUNT = 60000;
 const COLOR_BG     = 0x08001a;
@@ -76,15 +77,9 @@ const vertexShader = /* glsl */ `
   uniform float uShapeMix;
   uniform float uFlowStrength;   // tuning panel multiplier for flow amplitude
   // Audio-reactive gravity wells — particles drift toward each active point.
-  uniform vec3  uAttrPos0;
-  uniform vec3  uAttrPos1;
-  uniform vec3  uAttrPos2;
-  uniform vec3  uAttrPos3;
-  uniform float uAttrCount;  // active well count (0–4)
+  uniform vec3  uAttrPos[24];
+  uniform float uAttrCount;  // active well count (0–24)
   uniform float uAttrStr;    // global pull strength
-  uniform vec3  uCursorPos;      // world-space cursor intersection
-  uniform float uCursorStrength; // 0 = off, 1 = on
-  uniform float uCursorRadius;   // smoothstep outer edge (world units)
   attribute float aSize;
   attribute float aLayer;        // 0 = inner shell, 1 = outer shell
   attribute vec3 aSeed;
@@ -157,19 +152,11 @@ const vertexShader = /* glsl */ `
 
     // Gravity wells — pull particles toward each active attractor.
     // Applied before scatter so the cloud "remembers" well positions as it reforms.
-    if (uAttrCount > 0.5) pos += attrPull(uAttrPos0, pos);
-    if (uAttrCount > 1.5) pos += attrPull(uAttrPos1, pos);
-    if (uAttrCount > 2.5) pos += attrPull(uAttrPos2, pos);
-    if (uAttrCount > 3.5) pos += attrPull(uAttrPos3, pos);
-
-    // Cursor disruption — repels particles away from the cursor world position
-    if (uCursorStrength > 0.0) {
-      vec3 toCursor = pos - uCursorPos;
-      float d = max(length(toCursor), 0.5);
-      float force = uCursorStrength * 38.0 / (d * 0.045 + 1.0);
-      force *= smoothstep(uCursorRadius, 4.0, d);
-      pos += normalize(toCursor) * force;
+    for (int i = 0; i < 24; i++) {
+      if (float(i) >= uAttrCount) break;
+      pos += attrPull(uAttrPos[i], pos);
     }
+
 
     // Scatter — each particle flies to its own random chaos position, then reforms
     vec3 scatterTarget = aSeed * 50.0;
@@ -211,22 +198,25 @@ const fragmentShader = /* glsl */ `
 `;
 
 export class Visualizer {
-  constructor(canvas, { particleCount = 60000, pixelRatioLimit = 2 } = {}) {
+  constructor(canvas, { particleCount = 60000, pixelRatioLimit = 2, streamMode = false } = {}) {
     PARTICLE_COUNT = particleCount;
     this._pixelRatioLimit = pixelRatioLimit;
+    this._streamMode = streamMode;
     this.canvas = canvas;
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: false,
-      alpha: false,
+      alpha: streamMode,            // transparent canvas for OBS compositing
+      premultipliedAlpha: false,    // cleaner over arbitrary streamer backgrounds
       powerPreference: "high-performance",
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioLimit));
     this.renderer.setSize(window.innerWidth, window.innerHeight, false);
-    this.renderer.setClearColor(COLOR_BG, 1);
+    this.renderer.setClearColor(COLOR_BG, streamMode ? 0 : 1);
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x1a0330, 0.0055);
+    // Stream mode: no fog so particles don't fade into a coloured background
+    this.scene.fog = streamMode ? null : new THREE.FogExp2(0x1a0330, 0.0055);
 
     this.camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 600);
     this.camera.position.set(0, 12, 135);
@@ -253,13 +243,13 @@ export class Visualizer {
 
     // Attractor gravity wells — orbit the cloud, driven by audio.
     // angSpeed is relative: positive = CCW when viewed from above, negative = CW.
-    this._attrs = [
-      { angle: 0,               elev:  0.28, angSpeed:  1.00 },
-      { angle: Math.PI,         elev: -0.22, angSpeed: -0.70 },
-      { angle: Math.PI / 2,     elev:  0.40, angSpeed:  0.55 },
-      { angle: 3 * Math.PI / 2, elev: -0.38, angSpeed: -0.90 },
-    ];
-    this.cAttrCount  = 2;   // active wells (0–4); tuning panel "count" slider
+    // 24 slots evenly distributed, alternating elevation sign + varied speeds.
+    this._attrs = Array.from({ length: 24 }, (_, i) => ({
+      angle:    (i * Math.PI * 2) / 24,
+      elev:     (i % 2 === 0 ? 1 : -1) * (0.12 + (i % 7) * 0.045),
+      angSpeed: (i % 2 === 0 ? 1 : -1) * (0.40 + (i % 9) * 0.085),
+    }));
+    this.cAttrCount  = 2;   // active wells (0–24); tuning panel "count" slider
     this.cAttrRadius = 55;  // orbit radius; tuning panel "orbit radius" slider
 
     // Shape transition state — driven by setShape(). uShapeMix lerps to
@@ -302,6 +292,18 @@ export class Visualizer {
     this._buildParticles();
     this._buildComposer();
     this.clock = new THREE.Clock();
+
+    // OrbitControls — left-drag to orbit in 3D, scroll to zoom.
+    // Disabled during cinematic mode (lerp takes over).
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.target.set(0, -6, 0);
+    this.controls.enableDamping  = true;
+    this.controls.dampingFactor  = 0.06;
+    this.controls.rotateSpeed    = 0.45;
+    this.controls.enableZoom     = false;   // zoom buttons handle distance
+    this.controls.enablePan      = false;   // keep cloud centred
+    this.controls.minPolarAngle  = 0.15;    // ~9° — don't flip fully overhead
+    this.controls.maxPolarAngle  = Math.PI - 0.15;
 
     window.addEventListener("resize", () => this._onResize());
   }
@@ -669,15 +671,9 @@ export class Visualizer {
         uSizeCurve:    { value: 2.65 },
         uShapeMix:     { value: 0 },      // driven by setShape() transition system
         uFlowStrength: { value: 1.0  },   // curl-noise amplitude multiplier
-        uAttrPos0:  { value: new THREE.Vector3( 55,  0,  0) },
-        uAttrPos1:  { value: new THREE.Vector3(-55,  0,  0) },
-        uAttrPos2:  { value: new THREE.Vector3(  0,  0, 55) },
-        uAttrPos3:  { value: new THREE.Vector3(  0,  0,-55) },
+        uAttrPos:   { value: Array.from({ length: 24 }, () => new THREE.Vector3()) },
         uAttrCount: { value: 2 },
         uAttrStr:   { value: 7.5 },
-        uCursorPos:      { value: new THREE.Vector3(0, 0, 0) },
-        uCursorStrength: { value: 0 },
-        uCursorRadius:   { value: 72.0 },
       },
       vertexShader,
       fragmentShader,
@@ -697,21 +693,21 @@ export class Visualizer {
     // Mid drives orbit speed; bass expands the orbit radius momentarily.
     const speed = 0.06 + bands.mid * 0.22;
     const r     = this.cAttrRadius * (0.85 + bands.bass * 0.32);
-    const pos   = [u.uAttrPos0, u.uAttrPos1, u.uAttrPos2, u.uAttrPos3];
+    const arr = u.uAttrPos.value;
 
     this._attrs.forEach((a, i) => {
       a.angle += speed * a.angSpeed * dt;
       const cosE = Math.cos(a.elev);
       // Small vertical bob per attractor (different phase per index).
       const y = Math.sin(a.elev) * r * 0.45 + Math.sin(a.angle * 0.31 + i * 1.7) * 6;
-      pos[i].value.set(
+      arr[i].set(
         Math.cos(a.angle) * r * cosE,
         y,
         Math.sin(a.angle) * r * cosE,
       );
     });
 
-    u.uAttrCount.value = Math.min(4, Math.max(0, Math.round(this.cAttrCount)));
+    u.uAttrCount.value = Math.min(24, Math.max(0, Math.round(this.cAttrCount)));
   }
 
   // ── Colours ──────────────────────────────────────────────────────────────
@@ -743,7 +739,7 @@ export class Visualizer {
 
     this.particles.material.uniforms.uColorInner.value.copy(this._cInner);
     this.particles.material.uniforms.uColorOuter.value.copy(this._cOuter);
-    this.scene.fog.color.copy(this._cFog);
+    if (this.scene.fog) this.scene.fog.color.copy(this._cFog);
   }
 
   // ── Resize ───────────────────────────────────────────────────────────────
@@ -822,27 +818,37 @@ export class Visualizer {
     this.grid.position.z =
       (this.grid.position.z + dt * (this.fScroll + bands.bass * this.fScrollBass)) % this._gridRowSpacing;
 
-    // Camera: lerp position + lookAt toward target each frame. In cinematic
-    // mode, the target rotates between named scenes every _sceneInterval
-    // seconds; otherwise the target is the live front view with the zoom
-    // slider driving Z.
+    // Camera: cinematic mode lerps between named scenes; otherwise OrbitControls
+    // lets the user drag to any angle. Zoom buttons adjust distance from target.
     if (this._cinematic) {
+      this.controls.enabled = false;
       if (t - this._sceneT0 > this._sceneInterval) {
         this._sceneT0       = t;
         this._sceneInterval = 12 + Math.random() * 8;   // 12–20s between cuts
         this._cycleScene();
       }
+      this._camPos.lerp(this._camPosTarget,  0.035);
+      this._camLook.lerp(this._camLookTarget, 0.035);
+      this.camera.position.copy(this._camPos);
+      this.camera.position.y += Math.cos(t * 0.06) * 2.5;  // gentle bob
+      this.camera.lookAt(this._camLook);
     } else {
+      // Zoom: smoothly adjust distance from target along the current view axis.
       this._zoomCurrent += (this._zoomTarget - this._zoomCurrent) * 0.06;
-      this._camPosTarget.set(0, 12, this._zoomCurrent);
-      this._camLookTarget.set(0, -6, 0);
+      const dir = this.camera.position.clone().sub(this.controls.target);
+      const curDist = dir.length();
+      if (Math.abs(curDist - this._zoomCurrent) > 0.1) {
+        this.camera.position.copy(
+          dir.normalize().multiplyScalar(this._zoomCurrent).add(this.controls.target)
+        );
+      }
+      if (!this.controls.enabled) {
+        // Re-entering non-cinematic: sync controls to current camera state.
+        this.controls.update();
+        this.controls.enabled = true;
+      }
+      this.controls.update();
     }
-
-    this._camPos.lerp(this._camPosTarget,  0.035);
-    this._camLook.lerp(this._camLookTarget, 0.035);
-    this.camera.position.copy(this._camPos);
-    this.camera.position.y += Math.cos(t * 0.06) * 2.5;  // gentle bob
-    this.camera.lookAt(this._camLook);
 
     this.composer.render();
   }
@@ -855,6 +861,12 @@ export class Visualizer {
     if (this._cinematic && this.clock) {
       this._sceneT0       = this.clock.getElapsedTime();
       this._sceneInterval = 12 + Math.random() * 8;
+      this.controls.enabled = false;
+    } else {
+      // Hand camera back to OrbitControls from wherever cinematic left it.
+      this.controls.target.set(0, -6, 0);
+      this.controls.update();
+      this.controls.enabled = true;
     }
   }
   get cinematic() { return this._cinematic; }
@@ -888,37 +900,6 @@ export class Visualizer {
   get zoomDefault() { return this._zoomDefault; }
   get zoomTarget()  { return this._zoomTarget; }
 
-  // ── Cursor disruption ────────────────────────────────────────────────────
-
-  /** Convert canvas screen coords → world-space point on the plane through
-   *  the cloud centre (perpendicular to the camera view direction). */
-  screenToWorld(screenX, screenY) {
-    const ndcX = (screenX / this.renderer.domElement.clientWidth)  * 2 - 1;
-    const ndcY = -(screenY / this.renderer.domElement.clientHeight) * 2 + 1;
-    const dir = new THREE.Vector3(ndcX, ndcY, 0.5)
-      .unproject(this.camera)
-      .sub(this.camera.position)
-      .normalize();
-    // Intersect with the plane at origin perpendicular to the camera's view dir
-    const camDir = new THREE.Vector3();
-    this.camera.getWorldDirection(camDir);
-    const denom = camDir.dot(dir);
-    if (Math.abs(denom) < 1e-6) return null;
-    const t = -camDir.dot(this.camera.position) / denom;
-    return this.camera.position.clone().addScaledVector(dir, t);
-  }
-
-  /** Enable / disable cursor disruption. Pass worldPos from screenToWorld(). */
-  setCursorDisrupt(worldPos, active) {
-    const u = this.particles.material.uniforms;
-    u.uCursorStrength.value = active ? 1.0 : 0.0;
-    if (active && worldPos) u.uCursorPos.value.copy(worldPos);
-  }
-
-  /** Set the disruption radius (world units). Range ~15–200. */
-  setCursorRadius(r) {
-    this.particles.material.uniforms.uCursorRadius.value = r;
-  }
 
   // Live-tuning hook for the debug panel.
   //   uX → shader uniform on the particle material

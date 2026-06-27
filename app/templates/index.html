@@ -7,26 +7,21 @@
   <meta name="description" content="music visualizer" />
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}" />
 
-  <!-- Open Graph -->
+  <!-- Open Graph — text only, no image -->
   <meta property="og:type"        content="website" />
   <meta property="og:url"         content="https://voidpulse.xyz/" />
   <meta property="og:title"       content="Voidpulse" />
   <meta property="og:description" content="music visualizer" />
-  <meta property="og:image"        content="https://voidpulse.xyz/static/img/og.png" />
-  <meta property="og:image:type"   content="image/png" />
-  <meta property="og:image:width"  content="1200" />
-  <meta property="og:image:height" content="630" />
 
-  <!-- Twitter / X Card -->
-  <meta name="twitter:card"        content="summary_large_image" />
+  <!-- Twitter / X Card — summary (no image) -->
+  <meta name="twitter:card"        content="summary" />
   <meta name="twitter:title"       content="Voidpulse" />
   <meta name="twitter:description" content="music visualizer" />
-  <meta name="twitter:image"       content="https://voidpulse.xyz/static/img/og.png" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Share+Tech+Mono&display=swap" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ asset_v }}" />
   <script type="importmap">
     {
       "imports": {
@@ -51,25 +46,21 @@
 
   <canvas id="stage"></canvas>
 
-  <div id="mobile-notice">
-    <div class="mobile-notice-title">desktop recommended</div>
-    <div class="mobile-notice-body">tab audio capture requires a desktop browser. mic + file sources still work here.</div>
-    <button id="mobile-dismiss">got it</button>
-  </div>
+  <!-- Stream mode overlays (only rendered when ?stream=1) -->
+  <button id="stream-hint">click to activate mic</button>
+  <div id="stream-credit">voidpulse.xyz</div>
 
   <div id="hud">
     <div id="header-card">
       <div id="title">voidpulse</div>
       <div id="credit">add me on discord · fps_krow</div>
+      <div id="build-stamp">build {{ asset_v }} · {{ build_sha }}</div>
     </div>
 
-    <div id="now-playing" aria-live="polite" aria-label="Now playing">
-      <img id="np-art" src="" alt="" aria-hidden="true" />
-      <div id="np-text">
-        <div id="np-track"></div>
-        <div id="np-artist"></div>
-        <div id="np-status"></div>
-      </div>
+    <!-- Synced lyrics overlay (Spotify watcher + LRCLIB). Hidden until a
+         line is active. Sits above the source picker, fades between lines. -->
+    <div id="lyrics" aria-live="polite" aria-label="Synced lyrics">
+      <div class="lyric-line"></div>
     </div>
 
     <div id="lower-left">
@@ -81,12 +72,14 @@
         </div>
         <button id="ui-hide-btn" title="Hide all UI — only nameplate and zoom remain">⊘ hide ui</button>
       </div>
-      <div id="disrupt-controls">
-        <button id="cursor-disrupt-btn" title="Cursor disturbs the particle field">↯ disrupt</button>
-        <div id="disrupt-radius-row">
-          <label for="disrupt-radius-slider" id="disrupt-radius-label">radius</label>
-          <input type="range" id="disrupt-radius-slider" min="15" max="200" step="1" value="72">
-          <span id="disrupt-radius-val">72</span>
+
+      <!-- Now-playing sits directly below zoom, no gap -->
+      <div id="now-playing" aria-live="polite" aria-label="Now playing">
+        <img id="np-art" src="" alt="" aria-hidden="true" />
+        <div id="np-text">
+          <div id="np-track"></div>
+          <div id="np-artist"></div>
+          <div id="np-status"></div>
         </div>
       </div>
     </div>
@@ -105,11 +98,6 @@
     </div>
 
     <div id="source-picker">
-      <button class="src-btn" data-src="spotify" hidden>
-        <span class="dot"></span>
-        <span class="label">spotify</span>
-        <span class="hint">background link · auto-palette · pairs with audio</span>
-      </button>
       <button class="src-btn" data-src="system">
         <span class="dot"></span>
         <span class="label">tab audio</span>
@@ -126,6 +114,34 @@
         <span class="label">audio file</span>
         <span class="hint">fallback — pick an mp3</span>
       </label>
+      <button class="src-btn src-optional" data-src="spotify" hidden>
+        <span class="dot"></span>
+        <span class="label">spotify</span>
+        <span class="src-tag">optional</span>
+        <span class="hint">auto-palette · pairs with audio</span>
+      </button>
+    </div>
+
+    <!-- Hide-UI toggle — mobile only; positioned below the mic button via CSS -->
+    <button id="mobile-hide-btn">⊘ hide ui</button>
+
+    <!-- Sample search panel — mobile only (hidden on desktop via CSS) -->
+    <div id="sample-panel">
+      <div class="md-search-wrap">
+        <input id="md-search" type="search" placeholder="search any song…"
+               autocomplete="off" autocorrect="off" spellcheck="false">
+      </div>
+      <div id="md-results" class="md-tracks" hidden></div>
+      <div id="md-suggestions">
+        <div class="md-shelf-label">suggested</div>
+        <div id="md-tracks" class="md-tracks">
+          <div class="md-loading">
+            <span class="md-loading-dot"></span>
+            <span class="md-loading-dot"></span>
+            <span class="md-loading-dot"></span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="status-bar">
@@ -134,10 +150,17 @@
         <div class="ctrl-row" id="vol-row">
           <button class="ctrl-label" id="vol-label" data-reset-to="0.70">vol</button>
           <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="0.7" />
+          <input type="number" class="ctrl-num" id="vol-num" min="0" max="1" step="0.01" value="0.70" />
         </div>
         <div class="ctrl-row">
           <button class="ctrl-label" id="sens-label" data-reset-to="1.00">sens</button>
           <input type="range" id="sens-slider" min="0" max="1" step="0.01" value="0.535" />
+          <input type="number" class="ctrl-num" id="sens-num" min="0" max="1" step="0.01" value="0.54" />
+        </div>
+        <div class="ctrl-row">
+          <button class="ctrl-label" id="wells-label">wells</button>
+          <input type="range" id="wells-slider" min="0" max="24" step="1" value="2" />
+          <input type="number" class="ctrl-num" id="wells-num" min="0" max="24" step="1" value="2" />
         </div>
       </div>
       <button id="play-btn" hidden>play</button>
@@ -156,6 +179,7 @@
         </div>
       </div>
       <div class="tuning-presets">
+        <span class="row-label">preset</span>
         <button class="preset-btn" data-preset="starfield">starfield</button>
         <button class="preset-btn" data-preset="heart">heart</button>
         <button class="preset-btn" data-preset="nebula">nebula</button>
@@ -163,14 +187,17 @@
         <button class="preset-btn" data-preset="vapor">vapor</button>
       </div>
       <div class="tuning-palettes">
+        <span class="row-label">color</span>
         <button class="palette-btn" data-palette="synthwave" title="cyan + hot pink">synthwave</button>
         <button class="palette-btn" data-palette="inferno"   title="orange + deep red">inferno</button>
         <button class="palette-btn" data-palette="arctic"    title="cyan + cool blue">arctic</button>
         <button class="palette-btn" data-palette="toxic"     title="emerald + acid yellow">toxic</button>
         <button class="palette-btn" data-palette="void"      title="violet + magenta">void</button>
         <button class="palette-btn" data-palette="ember"     title="amber + crimson">ember</button>
+        <button class="palette-btn" data-palette="blackhole"  title="deep purple + violet">black hole</button>
       </div>
       <div class="tuning-shapes">
+        <span class="row-label">shape</span>
         <button class="shape-btn active" data-shape="sphere" title="uniform spherical shell">sphere</button>
         <button class="shape-btn"        data-shape="heart"  title="layered 3D heart">heart</button>
         <button class="shape-btn"        data-shape="torus"  title="donut ring">torus</button>
@@ -260,7 +287,7 @@
           </div>
           <div class="slider-row">
             <label>count</label>
-            <input type="range" data-uniform="cAttrCount" min="0" max="4" step="1" value="2">
+            <input type="range" data-uniform="cAttrCount" min="0" max="24" step="1" value="2">
             <span class="slider-val">2.00</span>
           </div>
           <div class="slider-row">
@@ -376,10 +403,9 @@
 
     <div id="mobile-cta">more features on desktop</div>
 
-    <button id="mobile-hide-btn">⊘ hide ui</button>
-
     <div id="mobile-panel">
       <div class="mobile-panel-row">
+        <span class="row-label">preset</span>
         <button class="preset-btn" data-preset="starfield">starfield</button>
         <button class="preset-btn" data-preset="heart">heart</button>
         <button class="preset-btn" data-preset="nebula">nebula</button>
@@ -387,12 +413,14 @@
         <button class="preset-btn" data-preset="vapor">vapor</button>
       </div>
       <div class="mobile-panel-row">
+        <span class="row-label">color</span>
         <button class="palette-btn" data-palette="synthwave">synthwave</button>
         <button class="palette-btn" data-palette="inferno">inferno</button>
         <button class="palette-btn" data-palette="arctic">arctic</button>
         <button class="palette-btn" data-palette="toxic">toxic</button>
         <button class="palette-btn" data-palette="void">void</button>
         <button class="palette-btn" data-palette="ember">ember</button>
+        <button class="palette-btn" data-palette="blackhole">black hole</button>
       </div>
       <div class="mobile-panel-actions">
         <button id="mobile-reset-btn">↺ reset</button>
@@ -440,6 +468,22 @@
         </div>
       </div>
     </div>
+
+    <button id="stream-btn" aria-label="Stream mode / OBS source">◈ stream</button>
+    <div id="stream-tooltip" hidden>
+      <div class="stream-obs-title">OBS Browser Source</div>
+      <div class="stream-url-row">
+        <code id="stream-url-display"></code>
+        <button id="stream-copy-btn">copy</button>
+      </div>
+      <ol class="stream-steps">
+        <li>OBS → Sources → <strong>+</strong> → Browser Source</li>
+        <li>Paste URL · set 1920 × 1080</li>
+        <li>Check ✅ <strong>Allow Transparency</strong></li>
+        <li>Click canvas or press <kbd>M</kbd> to activate mic</li>
+      </ol>
+      <a id="stream-open-link" href="" target="_blank" rel="noopener" class="stream-open-btn">open stream mode ↗</a>
+    </div>
   </div>
 
   <div id="cursor" aria-hidden="true">
@@ -447,6 +491,6 @@
     <div id="cursor-ring"></div>
   </div>
 
-  <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script type="module" src="{{ url_for('static', filename='js/main.js') }}?v={{ asset_v }}"></script>
 </body>
 </html>

@@ -3,6 +3,10 @@ import { Visualizer } from "./visualizer.js";
 import { SpotifyWatcher } from "./spotify.js";
 import { BeatTracker } from "./beat-tracker.js";
 
+// ── Stream mode (?stream=1) — transparent canvas, no UI, OBS browser source ──
+const STREAM_MODE = new URLSearchParams(location.search).has("stream");
+if (STREAM_MODE) document.body.classList.add("stream-mode");
+
 function detectPhone() {
   const coarse = window.matchMedia("(pointer: coarse)").matches;
   const touch  = navigator.maxTouchPoints > 1;
@@ -19,32 +23,33 @@ const sourceLabel = document.getElementById("source-label");
 const playBtn = document.getElementById("play-btn");
 const stopBtn = document.getElementById("stop-btn");
 const errorToast = document.getElementById("error-toast");
-const mobileNotice = document.getElementById("mobile-notice");
-const mobileDismiss = document.getElementById("mobile-dismiss");
 const volSlider   = document.getElementById("vol-slider");
 const sensSlider  = document.getElementById("sens-slider");
+const wellsSlider = document.getElementById("wells-slider");
+const volNum      = document.getElementById("vol-num");
+const sensNum     = document.getElementById("sens-num");
+const wellsNum    = document.getElementById("wells-num");
 const volRow      = document.getElementById("vol-row");
 const castBtn          = document.getElementById("cast-btn");
 const castTooltip      = document.getElementById("cast-tooltip");
 const helpBtn          = document.getElementById("help-btn");
 const helpTooltip      = document.getElementById("help-tooltip");
+const streamBtn        = document.getElementById("stream-btn");
+const streamTooltip    = document.getElementById("stream-tooltip");
 const spotifyTooltip   = document.getElementById("spotify-tooltip");
 const spotifyDisconnect = document.getElementById("spotify-disconnect");
 const npCard   = document.getElementById("now-playing");
 const npArt    = document.getElementById("np-art");
 const npTrack  = document.getElementById("np-track");
 const npArtist = document.getElementById("np-artist");
+const lyricsEl     = document.getElementById("lyrics");
+const lyricLineEl  = lyricsEl?.querySelector(".lyric-line");
 
 // ── custom cursor ────────────────────────────────────────────
 const cursorEl   = document.getElementById("cursor");
 const cursorRing = document.getElementById("cursor-ring");
 let _cursorBeatTimer = 0;
 
-// ── cursor disruption ─────────────────────────────────────────
-const cursorDisruptBtn    = document.getElementById("cursor-disrupt-btn");
-const disruptRadiusSlider = document.getElementById("disrupt-radius-slider");
-const disruptRadiusVal    = document.getElementById("disrupt-radius-val");
-let _cursorDisruptActive = false;
 
 // XP-style cursor trail — ring buffer of recent mouse positions.
 const TRAIL_COUNT = 10;
@@ -61,11 +66,6 @@ document.addEventListener("mousemove", (e) => {
   // Shift position history: newest at front, oldest at back.
   _trailPos.unshift({ x: e.clientX, y: e.clientY });
   _trailPos.length = TRAIL_COUNT;
-  // Feed world-space cursor position to the disruption shader when active.
-  if (_cursorDisruptActive) {
-    const world = viz.screenToWorld(e.clientX, e.clientY);
-    viz.setCursorDisrupt(world, true);
-  }
 });
 document.addEventListener("mouseleave", () => { cursorEl.style.opacity = "0"; });
 document.addEventListener("mouseenter", () => { cursorEl.style.opacity = "1"; });
@@ -124,7 +124,10 @@ const zoomOutBtn  = document.getElementById("zoom-out-btn");
 const zoomValue   = document.getElementById("zoom-value");
 
 const audio   = new AudioEngine();
-const viz     = new Visualizer(canvas, IS_PHONE ? { particleCount: 15000, pixelRatioLimit: 1.5 } : {});
+const viz     = new Visualizer(canvas, {
+  ...(IS_PHONE ? { particleCount: 15000, pixelRatioLimit: 1.5 } : {}),
+  streamMode: STREAM_MODE,
+});
 const spotify = new SpotifyWatcher();
 const spotifyBtn = document.querySelector('.src-btn[data-src="spotify"]');
 
@@ -155,7 +158,122 @@ async function connectBeatTracker() {
   if (bt) await bt.connect(audio.source);
 }
 
-// Photosensitivity warning — shown once per browser session.
+// ── Mobile detection ─────────────────────────────────────────────────────────
+const isMobile = navigator.maxTouchPoints > 0 && window.innerWidth < 900;
+
+// ── Sample search panel ──────────────────────────────────────────────────────
+const mdTracksEl    = document.getElementById("md-tracks");
+const mdResultsEl   = document.getElementById("md-results");
+const mdSuggestEl   = document.getElementById("md-suggestions");
+const mdSearchInput = document.getElementById("md-search");
+let _activeTrackBtn = null;
+
+/** Build a track card button from a { title, artist, preview_url, art_url } object. */
+function buildTrackCard(track) {
+  const btn = document.createElement("button");
+  btn.className = "md-track";
+  btn.innerHTML = `
+    <img class="md-art" src="${track.art_url || ""}" alt="" loading="lazy">
+    <div class="md-info">
+      <div class="md-track-title">${track.title}</div>
+      <div class="md-track-artist">${track.artist}</div>
+    </div>
+    <span class="md-play-icon">▶</span>
+  `;
+  btn.addEventListener("click", async () => {
+    if (_activeTrackBtn) {
+      _activeTrackBtn.classList.remove("md-playing");
+      _activeTrackBtn.querySelector(".md-play-icon").textContent = "▶";
+    }
+    _activeTrackBtn = btn;
+    btn.classList.add("md-playing");
+    btn.querySelector(".md-play-icon").textContent = "▐▐";
+    try {
+      await audio.loadUrl(track.preview_url, track.title);
+      await audio.play();
+      connectBeatTracker().catch(() => {});
+    } catch (err) {
+      showError(err.message || String(err));
+      return;
+    }
+    refreshUi();
+  });
+  return btn;
+}
+
+function renderTracks(container, tracks, emptyMsg) {
+  container.innerHTML = "";
+  if (!tracks.length) {
+    container.innerHTML = `<div class="md-empty">${emptyMsg}</div>`;
+    return;
+  }
+  tracks.forEach(t => container.appendChild(buildTrackCard(t)));
+}
+
+/** Load curated suggestions from our Flask endpoint (iTunes-backed, cached). */
+async function loadSuggestions() {
+  try {
+    const res = await fetch("/auth/spotify/demos");
+    const tracks = await res.json();
+    renderTracks(mdTracksEl, Array.isArray(tracks) ? tracks : [],
+      "previews unavailable — use mic below");
+  } catch {
+    mdTracksEl.innerHTML = '<div class="md-empty">couldn\'t load suggestions</div>';
+  }
+}
+
+/** Search iTunes directly from the browser (open CORS). */
+async function searchItunes(query) {
+  const url = `https://itunes.apple.com/search?${new URLSearchParams({
+    term: query, entity: "song", limit: 6, country: "US",
+  })}`;
+  const data = await fetch(url).then(r => r.json());
+  return (data.results || [])
+    .filter(item => item.previewUrl)
+    .map(item => ({
+      title:       item.trackName,
+      artist:      item.artistName,
+      preview_url: item.previewUrl,
+      art_url:     (item.artworkUrl100 || "").replace("100x100", "300x300"),
+    }));
+}
+
+// Debounced search — fires 350ms after the user stops typing.
+let _searchTimer = 0;
+mdSearchInput.addEventListener("input", () => {
+  const q = mdSearchInput.value.trim();
+  clearTimeout(_searchTimer);
+
+  if (!q) {
+    // Back to suggestions
+    mdResultsEl.hidden  = true;
+    mdSuggestEl.hidden  = false;
+    return;
+  }
+
+  // Show results area with loading dots while we wait.
+  mdSuggestEl.hidden  = true;
+  mdResultsEl.hidden  = false;
+  mdResultsEl.innerHTML = `<div class="md-loading">
+    <span class="md-loading-dot"></span>
+    <span class="md-loading-dot"></span>
+    <span class="md-loading-dot"></span>
+  </div>`;
+
+  _searchTimer = setTimeout(async () => {
+    try {
+      const tracks = await searchItunes(q);
+      renderTracks(mdResultsEl, tracks, "no previews found — try another track");
+    } catch {
+      mdResultsEl.innerHTML = '<div class="md-empty">search failed — try again</div>';
+    }
+  }, 350);
+});
+
+// Load suggestions immediately on mobile — panel is always visible inline.
+if (isMobile) loadSuggestions();
+
+// Photosensitivity warning — shown once per browser session (skipped in stream mode).
 const ewOverlay = document.getElementById("epilepsy-warning");
 const ewProceed = document.getElementById("ew-proceed");
 if (sessionStorage.getItem("voidpulse.ew.ack")) {
@@ -165,6 +283,34 @@ if (sessionStorage.getItem("voidpulse.ew.ack")) {
     sessionStorage.setItem("voidpulse.ew.ack", "1");
     ewOverlay.hidden = true;
   }, { once: true });
+}
+
+// Stream mode: clicking the canvas (or pressing M) activates the mic so the
+// streamer can go live without ever seeing the UI.  The hint overlay disappears
+// once the source is live.
+if (STREAM_MODE) {
+  const streamHint   = document.getElementById("stream-hint");
+  const streamCredit = document.getElementById("stream-credit");
+  let _streamMicDone = false;
+
+  // Fade the attribution credit out after 8 seconds.
+  setTimeout(() => streamCredit && streamCredit.classList.add("credit-fade"), 8000);
+
+  async function activateStreamMic() {
+    if (_streamMicDone) return;
+    _streamMicDone = true;
+    // Dismiss the hint (CSS transition fades it out).
+    if (streamHint) streamHint.classList.add("hint-dismissed");
+    try {
+      await audio.useMicrophone();
+      connectBeatTracker().catch(() => {});
+      refreshUi();
+    } catch { /* mic denied — visualizer still runs silently */ }
+  }
+  canvas.addEventListener("click", activateStreamMic, { once: true });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "m" || e.key === "M") activateStreamMic();
+  });
 }
 
 let errorTimer = 0;
@@ -233,6 +379,30 @@ function formatSpotifyLabel() {
   const status  = isPlaying ? "" : " (paused)";
   const where   = device?.name ? ` · ${device.name}` : "";
   return `spotify · ${track.name}${artists ? " — " + artists : ""}${status}${where}`;
+}
+
+/** Render the active synced lyric line. Empty/null hides the overlay.
+ *  LRC sometimes has blank lines at instrumental breaks — honor them by
+ *  fading out for the duration instead of holding the previous line. */
+let _lyricFadeTimer = 0;
+function renderLyric(line) {
+  if (!lyricsEl || !lyricLineEl) return;
+  const text = (line?.text || "").trim();
+  if (!text) {
+    lyricsEl.classList.remove("lyrics-visible");
+    lyricLineEl.classList.remove("lyric-show");
+    return;
+  }
+  lyricsEl.classList.add("lyrics-visible");
+  // Two-stage swap: fade old line out, swap text, fade new line in. The
+  // 180ms delay matches the CSS transition just enough to feel deliberate
+  // without lagging behind the music perceptibly.
+  lyricLineEl.classList.remove("lyric-show");
+  clearTimeout(_lyricFadeTimer);
+  _lyricFadeTimer = setTimeout(() => {
+    lyricLineEl.textContent = text;
+    lyricLineEl.classList.add("lyric-show");
+  }, 180);
 }
 
 /** Show/hide the now-playing card based on current Spotify state. */
@@ -317,12 +487,13 @@ async function activateSpotify() {
   // When no audio source is active, SpotifyWatcher.tick() synthesises bands
   // from the track's BPM so the cloud still breathes in time.
   try {
-    spotify.onTrackChange  = () => { refreshUi(); updateNowPlaying(); };
+    spotify.onTrackChange  = () => { refreshUi(); updateNowPlaying(); renderLyric(null); };
     spotify.onStateChange  = () => { refreshUi(); updateNowPlaying(); };
     spotify.onFeaturesLoad = (features) => {
       const palette = paletteForMood(features);
       if (palette) applyPalette(palette);
     };
+    spotify.onLyricLine    = (line) => renderLyric(line);
     spotify.onError = ({ type, message }) => {
       if (type !== "poll") showError(`Spotify ${type.replace(/_/g, " ")}: ${message}`);
     };
@@ -425,6 +596,10 @@ function frame() {
     freqDataR: audio.rawFreqR(),
   };
   viz.render(bands, audio.rawFreq(), beat, stereo);
+  // Resolve the active synced lyric line against the extrapolated Spotify
+  // playhead. Fires onLyricLine only when the index changes, so the DOM
+  // touch is rare even though this runs every frame.
+  if (spotify.lyrics) spotify.currentLyric();
   if (beat) pulseCursor();
   drawFavicon(beat);
   // Update XP trail: each ghost fades + shrinks toward the back.
@@ -439,7 +614,7 @@ function frame() {
 
 // Tuning panel: sliders write directly to shader uniforms, values persist
 // across reloads via localStorage so a good config survives a refresh.
-const TUNING_KEY = "voidpulse.tuning.v9";
+const TUNING_KEY = "voidpulse.tuning.v10";
 const savedTuning = JSON.parse(localStorage.getItem(TUNING_KEY) || "{}");
 
 // If a slider has data-exponent="N", the raw slider value is raised to the
@@ -528,7 +703,7 @@ const tuningRandom = document.getElementById("tuning-random");
 tuningRandom.addEventListener("click", () => {
   document.querySelectorAll("#tuning-panel input[type=range]").forEach(randomizeSlider);
   randomizeSlider(sensSlider);
-  const palettes = ["synthwave", "inferno", "arctic", "toxic", "void", "ember"];
+  const palettes = ["synthwave", "inferno", "arctic", "toxic", "void", "ember", "blackhole"];
   applyPalette(palettes[Math.floor(Math.random() * palettes.length)]);
   const shapes = ["sphere", "heart", "torus", "galaxy", "cube", "helix"];
   applyShape(shapes[Math.floor(Math.random() * shapes.length)]);
@@ -616,7 +791,7 @@ tuningReset.addEventListener("click", () => {
 // ── Stereo toggles ────────────────────────────────────────────────────────
 // Three independent on/off switches for particle hemisphere split, floor
 // channel split, and color divergence. Persist across reloads.
-const STEREO_KEY = "voidpulse.stereo.v1";
+const STEREO_KEY = "voidpulse.stereo.v2";
 const savedStereo = JSON.parse(localStorage.getItem(STEREO_KEY) || "{}");
 
 // Push a single stereo toggle to its visual + viz state. Doesn't persist —
@@ -706,20 +881,24 @@ const PRESETS = {
     stereo: { uStereoParticles: 0, fStereoFloor: 0, eStereoColor: 0 },
   },
   nebula: {
-    shape: "galaxy",
-    // Dreamy soft-glow cloud on a flat spiral disk: gentle breathe, slow
-    // rotation, low floor, high bloom, stereo color split for cyan/pink
-    // hemisphere tint across the spiral arms.
+    shape: "torus",
+    // Black hole accretion disk. Torus ring = disk with naturally dark center
+    // (event horizon). 3 tight-orbit attractors inside the ring radius create
+    // dense gravitational streams. Fast spin + high turbulent flow simulate
+    // orbital dynamics. Bloom is controlled — ring edge glows purple, center
+    // stays black. Bass beats = tidal disruption bursts.
     sliders: {
-      uBreatheMin: 0.55, uBreatheMax: 1.80, uBreatheCurve: 1.40,
-      uSizeMin:    0.35, uSizeMax:    2.00, uSizeCurve:    1.50,
-      cBurstInterval: 3.5, cRotateSpeed: 0.04,
-      fMaxH: 8, fScroll: 1.5, fScrollBass: 6, fDecay: 0.92, fHotCurve: 2.0,
-      bStrength: 0.50, bRadius: 0.55, bThreshold: 0.35,
-      eCycleSpeed: 0.04, eBassHue: 0.30, eTrebleHue: 0.20, eSatReact: 0.50, eBurstHue: 0.25,
-      cAttrCount: 1, uAttrStr: 4.5, cAttrRadius: 80,
+      uBreatheMin: 0.85, uBreatheMax: 1.35, uBreatheCurve: 0.55,
+      uSizeMin:    0.32, uSizeMax:    1.20, uSizeCurve:    2.60,
+      cBurstInterval: 2.5, cRotateSpeed: 0.52,
+      fMaxH: 28, fScroll: 5, fScrollBass: 20, fDecay: 0.80, fHotCurve: 2.5,
+      bStrength: 0.38, bRadius: 0.42, bThreshold: 0.55,
+      eCycleSpeed: 0.00, eBassHue: 0.05, eTrebleHue: 0.03, eSatReact: 0.15, eBurstHue: 0.12,
+      eInnerHue: 0.78, eOuterHue: 0.82,
+      cAttrCount: 9, uAttrStr: 22.0, cAttrRadius: 30,
+      uFlowStrength: 2.40,
     },
-    stereo: { uStereoParticles: 0, fStereoFloor: 0, eStereoColor: 1 },
+    stereo: { uStereoParticles: 1, fStereoFloor: 1, eStereoColor: 1 },
   },
   storm: {
     shape: "torus",
@@ -828,7 +1007,32 @@ const PALETTES = {
     cRotateSpeed: 0.06, uFlowStrength: 0.50,
     uBreatheMin: 0.65, uBreatheMax: 1.55, cBurstInterval: 5.0,
   },
+  // Black hole — deep purple accretion ring, black center. Pinned to purple
+  // (no hue drift), tight bloom so only the dense ring edge glows. Fast spin,
+  // high turbulence. Pairs with the nebula preset.
+  blackhole: {
+    eInnerHue: 0.78, eOuterHue: 0.82,
+    eCycleSpeed: 0.00, eBassHue: 0.05, eTrebleHue: 0.03, eSatReact: 0.15, eBurstHue: 0.12,
+    bStrength: 0.38, bRadius: 0.42, bThreshold: 0.55,
+    uSizeMin: 0.14, uSizeMax: 1.10, uSizeCurve: 3.00,
+    cRotateSpeed: 0.52, uFlowStrength: 2.40,
+    uBreatheMin: 0.85, uBreatheMax: 1.35,
+  },
 };
+
+// Drive --lyric-color and --lyric-glow CSS variables from the current outer
+// palette hue so lyrics are always legible. Complement (hue + 0.5) maximises
+// hue distance from the visualization; forced to high lightness (88%) so it
+// reads on dark backgrounds. Dark text-shadow backstop in CSS handles
+// legibility against bright particle clusters.
+function updateLyricColor() {
+  const outerH = (viz.eOuterHue ?? 0.84) * 360;
+  const contrastH = ((viz.eOuterHue ?? 0.84) + 0.5) % 1.0 * 360;
+  document.documentElement.style.setProperty(
+    "--lyric-color", `hsl(${contrastH.toFixed(0)}, 100%, 88%)`);
+  document.documentElement.style.setProperty(
+    "--lyric-glow",  `hsla(${contrastH.toFixed(0)}, 100%, 70%, 0.55)`);
+}
 
 function applyPalette(name) {
   const p = PALETTES[name];
@@ -839,6 +1043,7 @@ function applyPalette(name) {
     input.value = value;
     input.dispatchEvent(new Event("input"));
   }
+  updateLyricColor();
 }
 
 document.querySelectorAll("#tuning-panel .palette-btn").forEach((btn) => {
@@ -986,6 +1191,9 @@ shareBtn.addEventListener("click", () => {
 });
 
 window.addEventListener("hashchange", loadFromHash);
+// On a fresh load (new tuning key version, no saved state) apply nebula as the
+// default. loadFromHash() runs after so a URL hash can still override.
+if (Object.keys(savedTuning).length === 0) applyPreset("nebula");
 // Run after localStorage tuning/stereo init so hash takes precedence.
 loadFromHash();
 
@@ -1003,8 +1211,17 @@ const SENS_KEY = "voidpulse.sensitivity.v2"; // v2: stores raw 0–1 position, n
 const savedVol = parseFloat(localStorage.getItem(VOL_KEY));
 if (!isNaN(savedVol)) { volSlider.value = savedVol; }
 audio.setVolume(parseFloat(volSlider.value));
+volNum.value = parseFloat(volSlider.value).toFixed(2);
 volSlider.addEventListener("input", () => {
   const v = parseFloat(volSlider.value);
+  audio.setVolume(v);
+  localStorage.setItem(VOL_KEY, v);
+  volNum.value = v.toFixed(2);
+});
+volNum.addEventListener("change", () => {
+  const v = Math.max(0, Math.min(1, parseFloat(volNum.value) || 0));
+  volNum.value = v.toFixed(2);
+  volSlider.value = v;
   audio.setVolume(v);
   localStorage.setItem(VOL_KEY, v);
 });
@@ -1012,8 +1229,17 @@ volSlider.addEventListener("input", () => {
 const savedSens = parseFloat(localStorage.getItem(SENS_KEY));
 if (!isNaN(savedSens)) { sensSlider.value = savedSens; }
 audio.setSensitivity(sensTform(parseFloat(sensSlider.value)));
+sensNum.value = parseFloat(sensSlider.value).toFixed(2);
 sensSlider.addEventListener("input", () => {
   const raw = parseFloat(sensSlider.value);
+  audio.setSensitivity(sensTform(raw));
+  localStorage.setItem(SENS_KEY, raw);
+  sensNum.value = raw.toFixed(2);
+});
+sensNum.addEventListener("change", () => {
+  const raw = Math.max(0, Math.min(1, parseFloat(sensNum.value) || 0));
+  sensNum.value = raw.toFixed(2);
+  sensSlider.value = raw;
   audio.setSensitivity(sensTform(raw));
   localStorage.setItem(SENS_KEY, raw);
 });
@@ -1023,16 +1249,76 @@ const volLabel  = document.getElementById("vol-label");
 const sensLabel = document.getElementById("sens-label");
 
 volLabel.addEventListener("click", () => {
-  volSlider.value = volSlider.defaultValue;
-  audio.setVolume(parseFloat(volSlider.defaultValue));
+  const def = parseFloat(volSlider.defaultValue);
+  volSlider.value = def;
+  volNum.value    = def.toFixed(2);
+  audio.setVolume(def);
   localStorage.removeItem(VOL_KEY);
 });
 
 sensLabel.addEventListener("click", () => {
-  sensSlider.value = sensSlider.defaultValue;
-  audio.setSensitivity(sensTform(parseFloat(sensSlider.defaultValue)));
+  const def = parseFloat(sensSlider.defaultValue);
+  sensSlider.value = def;
+  sensNum.value    = def.toFixed(2);
+  audio.setSensitivity(sensTform(def));
   localStorage.removeItem(SENS_KEY);
 });
+
+// Wells slider — quick-access gravity well count, synced two-way with the
+// Advanced panel's cAttrCount slider so either control always agrees.
+const wellsLabel       = document.getElementById("wells-label");
+const tuningAttrCount  = document.querySelector('#tuning-panel input[data-uniform="cAttrCount"]');
+
+function syncWellsSlider(v) {
+  const n = parseInt(v, 10);
+  wellsSlider.value = n;
+  wellsNum.value    = n;
+}
+
+wellsSlider.addEventListener("input", () => {
+  const v = parseInt(wellsSlider.value, 10);
+  wellsNum.value = v;
+  if (tuningAttrCount) {
+    tuningAttrCount.value = v;
+    tuningAttrCount.dispatchEvent(new Event("input"));
+  } else {
+    viz.setTuning("cAttrCount", v);
+  }
+});
+
+wellsNum.addEventListener("change", () => {
+  const v = Math.max(0, Math.min(24, parseInt(wellsNum.value, 10) || 0));
+  wellsNum.value    = v;
+  wellsSlider.value = v;
+  if (tuningAttrCount) {
+    tuningAttrCount.value = v;
+    tuningAttrCount.dispatchEvent(new Event("input"));
+  } else {
+    viz.setTuning("cAttrCount", v);
+  }
+});
+
+wellsLabel.addEventListener("click", () => {
+  const def = parseInt(wellsSlider.defaultValue, 10);
+  syncWellsSlider(def);
+  if (tuningAttrCount) {
+    tuningAttrCount.value = def;
+    tuningAttrCount.dispatchEvent(new Event("input"));
+  } else {
+    viz.setTuning("cAttrCount", def);
+  }
+});
+
+// Keep wells slider in sync when the Advanced panel's cAttrCount slider is moved.
+if (tuningAttrCount) {
+  tuningAttrCount.addEventListener("input", () => {
+    syncWellsSlider(tuningAttrCount.value);
+  });
+  // Restore from savedTuning on load.
+  if (typeof savedTuning["cAttrCount"] === "number") {
+    syncWellsSlider(savedTuning["cAttrCount"]);
+  }
+}
 
 // Zoom controls — + and − step the camera Z in increments of ZOOM_STEP. The
 // visualizer lerps internally so each click eases in over ~0.5s. Percentage
@@ -1088,21 +1374,6 @@ function applyUiHidden(on) {
 applyUiHidden(localStorage.getItem(UI_HIDE_KEY) === "1");
 uiHideBtn.addEventListener("click", () => applyUiHidden(!document.body.classList.contains("ui-hidden")));
 
-// Cursor disruption toggle — enables particle repulsion from the cursor position.
-cursorDisruptBtn.addEventListener("click", () => {
-  _cursorDisruptActive = !_cursorDisruptActive;
-  cursorDisruptBtn.classList.toggle("active", _cursorDisruptActive);
-  if (!_cursorDisruptActive) viz.setCursorDisrupt(null, false);
-});
-
-// Disruption radius slider — scales the smoothstep outer edge in world units.
-disruptRadiusSlider.addEventListener("input", () => {
-  const r = parseInt(disruptRadiusSlider.value, 10);
-  disruptRadiusVal.textContent = r;
-  viz.setCursorRadius(r);
-});
-
-mobileDismiss.addEventListener("click", () => { mobileNotice.hidden = true; });
 
 spotifyDisconnect.addEventListener("click", (e) => {
   e.stopPropagation();
@@ -1114,19 +1385,47 @@ spotifyDisconnect.addEventListener("click", (e) => {
 
 helpBtn.addEventListener("click", (e) => {
   e.stopPropagation();
-  helpTooltip.hidden  = !helpTooltip.hidden;
-  castTooltip.hidden  = true;
+  helpTooltip.hidden    = !helpTooltip.hidden;
+  castTooltip.hidden    = true;
+  streamTooltip.hidden  = true;
   spotifyTooltip.hidden = true;
 });
 castBtn.addEventListener("click", (e) => {
   e.stopPropagation();
-  castTooltip.hidden  = !castTooltip.hidden;
-  helpTooltip.hidden  = true;
+  castTooltip.hidden    = !castTooltip.hidden;
+  helpTooltip.hidden    = true;
+  streamTooltip.hidden  = true;
   spotifyTooltip.hidden = true;
 });
+
+// ── Stream button ────────────────────────────────────────────────────────
+{
+  const streamUrl     = `${location.origin}/?stream=1`;
+  const urlDisplay    = document.getElementById("stream-url-display");
+  const copyBtn       = document.getElementById("stream-copy-btn");
+  const openLink      = document.getElementById("stream-open-link");
+  if (urlDisplay) urlDisplay.textContent = streamUrl;
+  if (openLink)   openLink.href = streamUrl;
+  copyBtn && copyBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(streamUrl).then(() => {
+      copyBtn.textContent = "copied!";
+      setTimeout(() => { copyBtn.textContent = "copy"; }, 2000);
+    }).catch(() => {});
+  });
+  streamBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    streamTooltip.hidden  = !streamTooltip.hidden;
+    helpTooltip.hidden    = true;
+    castTooltip.hidden    = true;
+    spotifyTooltip.hidden = true;
+  });
+}
+
 document.addEventListener("click", () => {
   castTooltip.hidden    = true;
   helpTooltip.hidden    = true;
+  streamTooltip.hidden  = true;
   spotifyTooltip.hidden = true;
 });
 
@@ -1155,28 +1454,9 @@ if (IS_PHONE) {
     applyShape("heart", false);
   });
 
-  // Disrupt — toggle mode, then touch the canvas to push particles.
-  const mobileDisruptBtn = document.getElementById("mobile-disrupt-btn");
-  mobileDisruptBtn.addEventListener("click", () => {
-    _cursorDisruptActive = !_cursorDisruptActive;
-    mobileDisruptBtn.classList.toggle("active", _cursorDisruptActive);
-    if (!_cursorDisruptActive) viz.setCursorDisrupt(null, false);
-  });
 
-  // Touch events on canvas drive the disrupt world position.
-  function handleTouchDisrupt(e) {
-    if (!_cursorDisruptActive) return;
-    e.preventDefault();
-    const t = e.touches[0];
-    if (!t) return;
-    const world = viz.screenToWorld(t.clientX, t.clientY);
-    viz.setCursorDisrupt(world, true);
-  }
-  canvas.addEventListener("touchstart",  handleTouchDisrupt, { passive: false });
-  canvas.addEventListener("touchmove",   handleTouchDisrupt, { passive: false });
-  canvas.addEventListener("touchend",    () => { if (_cursorDisruptActive) viz.setCursorDisrupt(null, false); }, { passive: true });
-  canvas.addEventListener("touchcancel", () => { if (_cursorDisruptActive) viz.setCursorDisrupt(null, false); }, { passive: true });
 }
 
 refreshUi();
+updateLyricColor(); // set initial lyric color from default/restored palette
 requestAnimationFrame(frame);

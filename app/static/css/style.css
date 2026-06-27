@@ -203,6 +203,14 @@ body::after {
   text-shadow: 0 0 6px rgba(255, 61, 240, 0.6);
 }
 
+#build-stamp {
+  font-family: "Share Tech Mono", monospace;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  color: rgba(0, 240, 255, 0.25);
+  margin-top: 3px;
+}
+
 /* ─── source picker ──────────────────────────────────────────── */
 #source-picker {
   position: fixed;
@@ -210,82 +218,151 @@ body::after {
   bottom: 100px;
   transform: translateX(-50%);
   display: flex;
-  gap: 12px;
+  align-items: stretch;
+  gap: 6px;
 }
 
 .src-btn {
   cursor: pointer;
   appearance: none;
-  border: 1px solid rgba(255, 61, 240, 0.35);
-  background: rgba(10, 0, 30, 0.7);
+  border: 1px solid rgba(255, 61, 240, 0.30);
+  background: rgba(10, 0, 30, 0.72);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   color: var(--text-soft);
   font-family: "Share Tech Mono", monospace;
   text-align: left;
-  border-radius: 4px;
-  padding: 12px 16px;
-  width: 200px;
+  border-radius: 3px;
+  padding: 7px 11px;
+  width: 130px;
   display: grid;
   grid-template-columns: auto 1fr;
   grid-template-rows: auto auto;
-  column-gap: 12px;
-  row-gap: 3px;
-  box-shadow: 0 0 0 1px rgba(255, 61, 240, 0.05),
-              0 0 18px rgba(255, 61, 240, 0.1);
+  column-gap: 8px;
+  row-gap: 0;
+  position: relative;
   transition: background 140ms ease, border-color 140ms ease,
               box-shadow 140ms ease, transform 140ms ease;
 }
-
 .src-btn:hover {
-  background: rgba(40, 0, 60, 0.8);
+  background: rgba(40, 0, 60, 0.82);
   border-color: var(--neon-pink);
   box-shadow: 0 0 0 1px var(--neon-pink),
-              0 0 24px rgba(255, 61, 240, 0.45);
-  transform: translateY(-2px);
+              0 0 16px rgba(255, 61, 240, 0.35);
+  transform: translateY(-1px);
 }
-
 .src-btn.active {
-  background: rgba(80, 0, 90, 0.75);
+  background: rgba(60, 0, 80, 0.78);
   border-color: var(--neon-cyan);
   box-shadow: 0 0 0 1px var(--neon-cyan),
-              0 0 30px rgba(0, 240, 255, 0.45);
+              0 0 20px rgba(0, 240, 255, 0.35);
 }
 
 .src-btn .dot {
   grid-row: 1 / span 2;
   align-self: center;
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: rgba(255, 61, 240, 0.3);
-  box-shadow: 0 0 4px rgba(255, 61, 240, 0.3);
+  background: rgba(255, 61, 240, 0.28);
+  box-shadow: 0 0 4px rgba(255, 61, 240, 0.28);
+  flex-shrink: 0;
 }
 .src-btn:hover .dot {
   background: var(--neon-pink);
-  box-shadow: 0 0 10px var(--neon-pink);
+  box-shadow: 0 0 8px var(--neon-pink);
 }
 .src-btn.active .dot {
   background: var(--neon-cyan);
-  box-shadow: 0 0 12px var(--neon-cyan), 0 0 0 4px rgba(0, 240, 255, 0.15);
+  box-shadow: 0 0 10px var(--neon-cyan), 0 0 0 3px rgba(0, 240, 255, 0.15);
 }
 
 .src-btn .label {
   font-family: "Orbitron", monospace;
   font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 0.22em;
+  font-size: 9px;
+  letter-spacing: 0.20em;
   text-transform: uppercase;
   color: var(--neon-cyan);
+  align-self: center;
 }
 .src-btn:hover .label { color: var(--neon-pink); }
-.src-btn.active .label { color: #fff; text-shadow: 0 0 8px var(--neon-cyan); }
+.src-btn.active .label { color: #fff; text-shadow: 0 0 6px var(--neon-cyan); }
 
 .src-btn .hint {
-  font-size: 10px;
-  opacity: 0.55;
-  letter-spacing: 0.06em;
+  grid-column: 2;
+  font-size: 8px;
+  letter-spacing: 0.05em;
   color: var(--text-dim);
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  line-height: 1.4;
+  transition: max-height 180ms ease, opacity 160ms ease 40ms;
+}
+.src-btn:hover .hint {
+  max-height: 36px;
+  opacity: 0.50;
+}
+
+/* ── Optional (Spotify) — dashed border + dimmed; visual cue = additive, not required */
+.src-btn.src-optional {
+  border-style: dashed;
+  border-color: rgba(165, 102, 255, 0.35);
+  background: rgba(10, 0, 30, 0.45);
+  opacity: 0.70;
+  margin-left: 8px;
+  position: relative;
+}
+.src-btn.src-optional::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 15%;
+  height: 70%;
+  width: 1px;
+  background: rgba(165, 102, 255, 0.20);
+}
+.src-btn.src-optional:hover {
+  border-color: var(--neon-violet);
+  box-shadow: 0 0 0 1px var(--neon-violet),
+              0 0 16px rgba(165, 102, 255, 0.30);
+  opacity: 1;
+}
+.src-btn.src-optional.active {
+  border-style: solid;
+  border-color: var(--neon-violet);
+  box-shadow: 0 0 0 1px var(--neon-violet),
+              0 0 20px rgba(165, 102, 255, 0.35);
+  opacity: 1;
+}
+.src-btn.src-optional .dot {
+  background: rgba(165, 102, 255, 0.28);
+  box-shadow: 0 0 4px rgba(165, 102, 255, 0.28);
+}
+.src-btn.src-optional:hover .dot {
+  background: var(--neon-violet);
+  box-shadow: 0 0 8px var(--neon-violet);
+}
+.src-btn.src-optional.active .dot {
+  background: var(--neon-violet);
+  box-shadow: 0 0 10px var(--neon-violet), 0 0 0 3px rgba(165, 102, 255, 0.15);
+}
+.src-btn.src-optional .label { color: var(--neon-violet); }
+.src-btn.src-optional:hover .label { color: var(--neon-violet); filter: brightness(1.25); }
+.src-btn.src-optional.active .label { color: #fff; text-shadow: 0 0 6px var(--neon-violet); }
+
+.src-tag {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-family: "Share Tech Mono", monospace;
+  font-size: 6px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(165, 102, 255, 0.50);
+  pointer-events: none;
+  user-select: none;
 }
 
 .file-btn { cursor: pointer; }
@@ -294,34 +371,34 @@ body::after {
 #status-bar {
   position: fixed;
   left: 50%;
-  bottom: 36px;
+  bottom: 30px;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 18px;
+  gap: 10px;
+  padding: 7px 14px;
   background: rgba(10, 0, 30, 0.75);
-  border: 1px solid rgba(0, 240, 255, 0.35);
+  border: 1px solid rgba(0, 240, 255, 0.30);
   border-radius: 2px;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   font-family: "Share Tech Mono", monospace;
-  font-size: 11px;
-  letter-spacing: 0.18em;
+  font-size: 10px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  box-shadow: 0 0 18px rgba(0, 240, 255, 0.12);
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.10);
 }
 
 #audio-controls {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .ctrl-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   transition: opacity 200ms ease;
 }
 
@@ -339,7 +416,7 @@ body::after {
   text-transform: uppercase;
   color: var(--neon-cyan);
   opacity: 0.7;
-  width: 26px;
+  min-width: 32px;
   text-align: right;
   flex-shrink: 0;
   cursor: pointer;
@@ -389,37 +466,65 @@ body::after {
   pointer-events: none;
 }
 
-#vol-slider, #sens-slider {
+#vol-slider, #sens-slider, #wells-slider {
   appearance: none;
   -webkit-appearance: none;
-  width: 80px;
-  height: 3px;
-  background: rgba(0, 240, 255, 0.2);
+  width: 64px;
+  height: 2px;
+  background: rgba(0, 240, 255, 0.18);
   border-radius: 2px;
   outline: none;
   cursor: pointer;
+  flex-shrink: 0;
 }
 #vol-slider::-webkit-slider-thumb,
-#sens-slider::-webkit-slider-thumb {
+#sens-slider::-webkit-slider-thumb,
+#wells-slider::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
-  width: 11px;
-  height: 11px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background: var(--neon-cyan);
-  box-shadow: 0 0 6px var(--neon-cyan);
+  box-shadow: 0 0 5px var(--neon-cyan);
   cursor: pointer;
 }
 #vol-slider::-moz-range-thumb,
-#sens-slider::-moz-range-thumb {
-  width: 11px;
-  height: 11px;
+#sens-slider::-moz-range-thumb,
+#wells-slider::-moz-range-thumb {
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background: var(--neon-cyan);
   border: none;
-  box-shadow: 0 0 6px var(--neon-cyan);
+  box-shadow: 0 0 5px var(--neon-cyan);
   cursor: pointer;
 }
+
+/* Numeric inputs alongside each slider */
+.ctrl-num {
+  appearance: none;
+  -moz-appearance: textfield;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.25);
+  color: var(--neon-cyan);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  width: 34px;
+  padding: 0 2px 1px;
+  outline: none;
+  flex-shrink: 0;
+  opacity: 0.70;
+  transition: border-color 120ms ease, opacity 120ms ease;
+}
+.ctrl-num::-webkit-inner-spin-button,
+.ctrl-num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.ctrl-num:hover  { opacity: 1; border-color: rgba(0, 240, 255, 0.5); }
+.ctrl-num:focus  { opacity: 1; border-color: var(--neon-cyan); outline: none;
+                   box-shadow: 0 1px 0 0 rgba(0, 240, 255, 0.3); }
 
 #source-label {
   color: var(--neon-cyan);
@@ -737,6 +842,25 @@ body::after {
 }
 
 /* Preset chips under the panel header. */
+/* Inline dim label that opens each chip row (preset / color / shape).
+   Sits flush with the chips, self-aligns to center so it doesn't throw
+   off the row height. Each row's accent color is inherited via color. */
+.row-label {
+  font-family: "Share Tech Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(246, 214, 255, 0.65);
+  align-self: center;
+  white-space: nowrap;
+  padding-right: 4px;
+  pointer-events: none;
+  user-select: none;
+}
+.tuning-presets  .row-label { color: rgba(  0, 240, 255, 0.70); }
+.tuning-palettes .row-label { color: rgba(255,  61, 240, 0.70); }
+.tuning-shapes   .row-label { color: rgba(165, 102, 255, 0.70); }
+
 .tuning-presets {
   display: flex;
   flex-wrap: wrap;
@@ -1126,7 +1250,7 @@ body::after {
   text-shadow: 0 0 5px rgba(0, 240, 255, 0.5);
 }
 
-/* ─── lower-left column: zoom row + cursor disrupt toggle ───── */
+/* ─── lower-left column: zoom row ───── */
 #lower-left {
   position: fixed;
   top: 88px;
@@ -1134,7 +1258,7 @@ body::after {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
+  gap: 10px;
   pointer-events: auto;
   z-index: 11;
 }
@@ -1143,17 +1267,17 @@ body::after {
 #zoom-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
 }
 
 #zoom-controls {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   background: rgba(10, 0, 30, 0.7);
   border: 1px solid rgba(0, 240, 255, 0.25);
   border-radius: 4px;
-  padding: 6px 10px;
+  padding: 8px 14px;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   box-shadow: 0 0 18px rgba(0, 240, 255, 0.08);
@@ -1185,15 +1309,15 @@ body::after {
 .zoom-step {
   appearance: none;
   cursor: pointer;
-  width: 24px;
-  height: 22px;
+  width: 28px;
+  height: 26px;
   background: rgba(0, 240, 255, 0.05);
   border: 1px solid rgba(0, 240, 255, 0.3);
   border-radius: 2px;
   color: var(--neon-cyan);
   font-family: "Orbitron", monospace;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1;
   padding: 0;
   display: inline-flex;
@@ -1291,64 +1415,359 @@ body::after {
   line-height: 1.5;
 }
 
-/* ─── mobile notice (hidden on desktop) ──────────────────────── */
-#mobile-notice {
-  display: none;
+/* ─── Stream button + tooltip ────────────────────────────────── */
+#stream-btn {
+  position: fixed;
+  bottom: 20px;
+  left: 162px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 61, 240, 0.45);
+  border-radius: 2px;
+  background: rgba(10, 0, 30, 0.7);
+  color: var(--neon-pink);
+  font-family: "Orbitron", monospace;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-shadow: 0 0 6px rgba(255, 61, 240, 0.7);
+  padding: 6px 12px;
+  backdrop-filter: blur(6px);
+  transition: background 140ms ease, box-shadow 140ms ease;
+}
+#stream-btn:hover {
+  background: rgba(255, 61, 240, 0.1);
+  box-shadow: 0 0 16px rgba(255, 61, 240, 0.4);
 }
 
-@media (max-width: 768px) {
-  #mobile-notice {
+#stream-tooltip {
+  position: fixed;
+  bottom: 56px;
+  left: 162px;
+  width: 310px;
+  background: rgba(8, 0, 26, 0.94);
+  border: 1px solid rgba(255, 61, 240, 0.4);
+  border-radius: 4px;
+  padding: 14px 16px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 28px rgba(255, 61, 240, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 20;
+}
+
+.stream-obs-title {
+  font-family: "Orbitron", monospace;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--neon-pink);
+  text-shadow: 0 0 8px rgba(255, 61, 240, 0.6);
+}
+
+.stream-url-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 61, 240, 0.07);
+  border: 1px solid rgba(255, 61, 240, 0.25);
+  border-radius: 3px;
+  padding: 6px 10px;
+}
+
+#stream-url-display {
+  flex: 1;
+  font-family: "Share Tech Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+#stream-copy-btn {
+  flex-shrink: 0;
+  appearance: none;
+  background: rgba(255, 61, 240, 0.15);
+  border: 1px solid rgba(255, 61, 240, 0.4);
+  border-radius: 2px;
+  color: var(--neon-pink);
+  font-family: "Orbitron", monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+#stream-copy-btn:hover {
+  background: rgba(255, 61, 240, 0.28);
+}
+
+.stream-steps {
+  font-family: "Share Tech Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  line-height: 1.6;
+  padding-left: 16px;
+  margin: 0;
+}
+.stream-steps li { margin-bottom: 2px; }
+.stream-steps strong { color: var(--text-soft); }
+.stream-steps kbd {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 2px;
+  padding: 0 4px;
+  font-family: inherit;
+  font-size: 10px;
+}
+
+.stream-open-btn {
+  display: block;
+  text-align: center;
+  font-family: "Orbitron", monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--neon-pink);
+  text-shadow: 0 0 8px rgba(255, 61, 240, 0.5);
+  text-decoration: none;
+  padding: 7px 0;
+  border: 1px solid rgba(255, 61, 240, 0.35);
+  border-radius: 3px;
+  transition: background 130ms ease, box-shadow 130ms ease;
+}
+.stream-open-btn:hover {
+  background: rgba(255, 61, 240, 0.1);
+  box-shadow: 0 0 14px rgba(255, 61, 240, 0.3);
+}
+
+/* ─── sample search panel (inline, mobile only) ──────────────── */
+#sample-panel {
+  display: none; /* hidden on desktop */
+}
+/* Search bar */
+.md-search-wrap {
+  width: 100%;
+}
+#md-search {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(10, 0, 30, 0.7);
+  border: 1px solid rgba(0, 240, 255, 0.22);
+  border-radius: 6px;
+  padding: 11px 14px;
+  font-family: "Share Tech Mono", monospace;
+  font-size: 14px;
+  letter-spacing: 0.05em;
+  color: rgba(246, 214, 255, 0.9);
+  outline: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+#md-search::placeholder { color: rgba(246, 214, 255, 0.25); }
+#md-search:focus {
+  border-color: rgba(0, 240, 255, 0.55);
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.15);
+}
+#md-search::-webkit-search-cancel-button { display: none; }
+
+/* Suggestions shelf label */
+.md-shelf-label {
+  font-family: "Orbitron", monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(0, 240, 255, 0.35);
+  margin-bottom: 8px;
+}
+
+/* Track card list */
+/* Search results — full-width rows */
+.md-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+/* Individual track card — tappable */
+.md-track {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(10, 0, 30, 0.65);
+  border: 1px solid rgba(0, 240, 255, 0.14);
+  border-radius: 6px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+}
+.md-track:active,
+.md-track.md-playing {
+  border-color: rgba(0, 240, 255, 0.55);
+  background: rgba(0, 240, 255, 0.08);
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.15);
+}
+
+.md-art {
+  width: 44px;
+  height: 44px;
+  border-radius: 3px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: rgba(0, 240, 255, 0.06);
+}
+.md-info {
+  flex: 1;
+  overflow: hidden;
+}
+.md-track-title {
+  font-family: "Orbitron", monospace;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.10em;
+  color: rgba(246, 214, 255, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.md-track-artist {
+  font-family: "Share Tech Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  color: rgba(0, 240, 255, 0.5);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.md-play-icon {
+  font-size: 13px;
+  color: rgba(0, 240, 255, 0.4);
+  flex-shrink: 0;
+  transition: color 180ms ease, text-shadow 180ms ease;
+}
+.md-track.md-playing .md-play-icon {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.8);
+}
+
+/* ── Suggestions shelf — horizontal thirds ─────────────────────
+   Override the column card layout for the curated picks row.
+   Art fills the top of each card; title + artist sit below.    */
+#md-suggestions .md-tracks {
+  flex-direction: row;
+  gap: 8px;
+}
+#md-suggestions .md-track {
+  flex: 1;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+#md-suggestions .md-art {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 4px 4px 0 0;
+}
+#md-suggestions .md-info {
+  padding: 6px 8px 7px;
+}
+#md-suggestions .md-track-title {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+#md-suggestions .md-track-artist {
+  font-size: 8px;
+  margin-top: 2px;
+}
+#md-suggestions .md-play-icon { display: none; }
+
+/* Loading dots */
+.md-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 0;
+}
+.md-loading-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(0, 240, 255, 0.5);
+  animation: md-pulse 1.2s ease-in-out infinite;
+}
+.md-loading-dot:nth-child(2) { animation-delay: 0.2s; }
+.md-loading-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes md-pulse {
+  0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
+
+/* Empty / error state */
+.md-empty {
+  font-family: "Share Tech Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: rgba(246, 214, 255, 0.35);
+  text-align: center;
+  padding: 24px 0;
+}
+
+/* Skip button */
+#md-skip {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  font-family: "Share Tech Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: rgba(246, 214, 255, 0.28);
+  cursor: pointer;
+  padding: 8px 16px;
+  transition: color 160ms ease;
+}
+/* ─── sample panel — show inline on mobile ────────────────────── */
+@media (max-width: 900px) {
+  /* Hide fixed desktop controls that collide with the scrollable panel */
+  #lower-left { display: none !important; }
+
+  #sample-panel {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 12px;
-    position: fixed;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: calc(100vw - 48px);
-    background: rgba(8, 0, 26, 0.92);
-    border: 1px solid rgba(255, 61, 240, 0.5);
-    border-radius: 4px;
-    padding: 18px 20px;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 0 28px rgba(255, 61, 240, 0.2);
-    text-align: center;
-    z-index: 30;
+    gap: 10px;
+    width: 100%;
+    /* Push below fixed nameplate (thin row bar ~32px at top:12px) */
+    padding: 52px 0 8px;
   }
-  .mobile-notice-title {
-    font-family: "Orbitron", monospace;
-    font-weight: 700;
-    font-size: 11px;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: var(--neon-pink);
-    text-shadow: 0 0 8px rgba(255, 61, 240, 0.7);
-  }
-  .mobile-notice-body {
-    font-family: "Share Tech Mono", monospace;
-    font-size: 12px;
-    letter-spacing: 0.05em;
-    color: var(--text-dim);
-    line-height: 1.5;
-  }
-  #mobile-dismiss {
-    font-family: "Orbitron", monospace;
-    font-weight: 700;
-    font-size: 10px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--neon-pink);
-    background: transparent;
-    border: 1px solid rgba(255, 61, 240, 0.4);
-    border-radius: 2px;
-    padding: 6px 16px;
-    cursor: pointer;
-    transition: background 140ms ease, box-shadow 140ms ease;
-  }
-  #mobile-dismiss:hover {
-    background: rgba(255, 61, 240, 0.1);
-    box-shadow: 0 0 12px rgba(255, 61, 240, 0.3);
+
+  /* Compact suggestion art — fixed height instead of full square */
+  #md-suggestions .md-art {
+    height: 72px;
+    aspect-ratio: auto;
   }
 }
 
@@ -1358,9 +1777,7 @@ body::after {
    #header-card but pink-accented to signal it's Spotify data.
    ──────────────────────────────────────────────────────────────────── */
 #now-playing {
-  position: fixed;
-  top: 176px;
-  left: 20px;
+  /* Flows inside #lower-left flex column — no fixed positioning needed. */
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1431,6 +1848,58 @@ body::after {
   transition: opacity 0.6s ease, transform 0.35s ease;
 }
 
+/* ─── synced lyrics overlay ──────────────────────────────────────────
+   Floats above the source picker, centered. Each line fades + drifts
+   upward as it swaps. Neon cyan with synthwave glow; magenta accent
+   underline echoes the rest of the chrome.
+   ──────────────────────────────────────────────────────────────────── */
+#lyrics {
+  position: fixed;
+  left: 50%;
+  bottom: 210px;
+  transform: translateX(-50%);
+  width: min(960px, 86vw);
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  z-index: 4;
+}
+#lyrics.lyrics-visible {
+  opacity: 1;
+}
+#lyrics .lyric-line {
+  font-family: "Orbitron", "Share Tech Mono", monospace;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.35;
+  /* Color driven by JS via --lyric-color (complement of current outer palette hue).
+     Falls back to neon-cyan. Dark backstop shadows ensure legibility on any
+     preset, including bright inferno/toxic where a pure glow color would wash out. */
+  color: var(--lyric-color, var(--neon-cyan));
+  text-shadow:
+    0 0 8px  var(--lyric-glow, rgba(0, 240, 255, 0.55)),
+    0 0 20px var(--lyric-glow, rgba(0, 240, 255, 0.35)),
+    0 2px 10px rgba(0, 0, 0, 0.95),
+    0 0 28px  rgba(0, 0, 0, 0.7);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.28s ease, transform 0.28s ease;
+  display: inline-block;
+  padding: 6px 18px 8px;
+  background: linear-gradient(180deg, transparent 0%, transparent 78%, rgba(255, 61, 240, 0.18) 100%);
+}
+#lyrics .lyric-line.lyric-show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Hide on mobile (already crowded) and in stream/OBS mode. */
+.is-phone #lyrics            { display: none !important; }
+body.stream-mode #lyrics     { display: none !important; }
+/* In UI-hidden mode lyrics are content, not chrome — keep them visible. */
+
 /* ─── UI hide mode ───────────────────────────────────────────────────
    body.ui-hidden collapses everything except #header-card + #lower-left.
    The hide button sits in the lower-left row so it's always reachable.
@@ -1442,6 +1911,8 @@ body.ui-hidden #help-btn,
 body.ui-hidden #help-tooltip,
 body.ui-hidden #cast-btn,
 body.ui-hidden #cast-tooltip,
+body.ui-hidden #stream-btn,
+body.ui-hidden #stream-tooltip,
 body.ui-hidden #spotify-tooltip {
   display: none !important;
 }
@@ -1461,7 +1932,7 @@ body.ui-hidden #spotify-tooltip {
   font-size: 9px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  padding: 6px 10px;
+  padding: 8px 14px;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   box-shadow: 0 0 18px rgba(0, 240, 255, 0.04);
@@ -1473,101 +1944,6 @@ body.ui-hidden #spotify-tooltip {
   box-shadow: 0 0 14px rgba(0, 240, 255, 0.2);
 }
 
-/* Wrapper keeps the button + radius slider in one column unit */
-#disrupt-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-/* Radius slider row — compact, aligned with button width */
-#disrupt-radius-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 2px;
-}
-#disrupt-radius-label {
-  font-family: "Orbitron", monospace;
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgba(246, 214, 255, 0.35);
-  white-space: nowrap;
-  user-select: none;
-}
-#disrupt-radius-val {
-  font-family: "Share Tech Mono", monospace;
-  font-size: 9px;
-  color: rgba(0, 240, 255, 0.5);
-  min-width: 24px;
-  text-align: right;
-}
-#disrupt-radius-slider {
-  -webkit-appearance: none;
-  appearance: none;
-  flex: 1;
-  height: 2px;
-  background: rgba(0, 240, 255, 0.15);
-  border-radius: 1px;
-  outline: none;
-  cursor: pointer;
-}
-#disrupt-radius-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: rgba(0, 240, 255, 0.7);
-  box-shadow: 0 0 6px rgba(0, 240, 255, 0.5);
-  cursor: pointer;
-}
-#disrupt-radius-slider::-moz-range-thumb {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(0, 240, 255, 0.7);
-  box-shadow: 0 0 6px rgba(0, 240, 255, 0.5);
-  cursor: pointer;
-}
-
-/* Cursor disruption toggle — same glass card language as #ui-hide-btn. */
-#cursor-disrupt-btn {
-  appearance: none;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  background: rgba(10, 0, 30, 0.7);
-  border: 1px solid rgba(0, 240, 255, 0.18);
-  border-radius: 4px;
-  color: rgba(246, 214, 255, 0.45);
-  font-family: "Orbitron", monospace;
-  font-weight: 700;
-  font-size: 9px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  padding: 6px 10px;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  box-shadow: 0 0 18px rgba(0, 240, 255, 0.04);
-  transition: color 160ms ease, border-color 160ms ease,
-              box-shadow 160ms ease, background 160ms ease;
-}
-#cursor-disrupt-btn:hover {
-  color: var(--neon-cyan);
-  border-color: rgba(0, 240, 255, 0.45);
-  box-shadow: 0 0 14px rgba(0, 240, 255, 0.2);
-}
-/* Active state: glows cyan to signal disruption is on */
-#cursor-disrupt-btn.active {
-  color: var(--neon-cyan);
-  border-color: rgba(0, 240, 255, 0.65);
-  background: rgba(0, 240, 255, 0.1);
-  box-shadow: 0 0 12px rgba(0, 240, 255, 0.35), 0 0 24px rgba(0, 240, 255, 0.12);
-  text-shadow: 0 0 8px rgba(0, 240, 255, 0.7);
-}
 
 /* In hidden mode the button is the sole CTA — make it pulse so it's obvious. */
 body.ui-hidden #ui-hide-btn {
@@ -1757,6 +2133,8 @@ body.ui-hidden #ui-hide-btn {
 .is-phone #help-tooltip      { display: none !important; }
 .is-phone #cast-btn          { display: none !important; }
 .is-phone #cast-tooltip      { display: none !important; }
+.is-phone #stream-btn        { display: none !important; }
+.is-phone #stream-tooltip    { display: none !important; }
 .is-phone #mobile-notice     { display: none !important; }
 .is-phone #now-playing       { display: none !important; }
 .is-phone #spotify-tooltip   { display: none !important; }
@@ -1777,16 +2155,37 @@ body.ui-hidden #ui-hide-btn {
   width: 200px;
 }
 
-/* Nameplate — pulled out of #hud flow and centered at the top */
+/* Nameplate — wider thin bar pinned to the top on phone */
 .is-phone #header-card {
   position: fixed;
-  top: 20px;
+  top: 12px;
   left: 50%;
   transform: translateX(-50%);
-  text-align: center;
+  width: calc(100vw - 32px);
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  gap: 12px;
 }
 
-/* Hide UI button — centered below nameplate, always visible on phone */
+.is-phone #title {
+  font-size: 12px;
+  letter-spacing: 0.35em;
+  white-space: nowrap;
+}
+
+.is-phone #credit {
+  font-size: 8px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.is-phone #build-stamp {
+  display: none;
+}
+
+/* Hide UI button — small text-only; sits between status bar and mic button */
 #mobile-hide-btn {
   display: none;
 }
@@ -1795,35 +2194,27 @@ body.ui-hidden #ui-hide-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
   position: fixed;
-  top: 108px;
+  bottom: calc(88px + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
-  width: 160px;
-  height: 32px;
+  z-index: 20;
   appearance: none;
-  background: rgba(10, 0, 30, 0.75);
-  border: 1px solid rgba(0, 240, 255, 0.3);
-  border-radius: 4px;
-  color: rgba(0, 240, 255, 0.65);
+  background: transparent;
+  border: none;
+  color: rgba(0, 240, 255, 0.28);
   font-family: "Orbitron", monospace;
   font-weight: 700;
-  font-size: 9px;
-  letter-spacing: 0.2em;
+  font-size: 8px;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
-  z-index: 20;
-  box-shadow: 0 0 14px rgba(0, 240, 255, 0.08);
-  transition: color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+  padding: 6px 20px;
+  transition: color 140ms ease;
 }
 
 .is-phone #mobile-hide-btn:active {
-  color: var(--neon-cyan);
-  border-color: rgba(0, 240, 255, 0.6);
-  box-shadow: 0 0 18px rgba(0, 240, 255, 0.2);
+  color: rgba(0, 240, 255, 0.65);
 }
 
 /* CTA — subtle dim text just above the mobile panel */
@@ -1875,6 +2266,7 @@ body.ui-hidden #ui-hide-btn {
 
 .mobile-panel-row {
   display: flex;
+  align-items: center;
   gap: 6px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -1917,25 +2309,6 @@ body.ui-hidden #ui-hide-btn {
 }
 #mobile-reset-btn:active { color: rgba(246, 214, 255, 0.7); }
 
-#mobile-disrupt-btn {
-  appearance: none;
-  background: transparent;
-  border: none;
-  color: rgba(0, 240, 255, 0.35);
-  font-family: "Orbitron", monospace;
-  font-weight: 700;
-  font-size: 9px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  cursor: pointer;
-  padding: 4px 0;
-  transition: color 140ms ease;
-}
-#mobile-disrupt-btn:active { color: rgba(0, 240, 255, 0.7); }
-#mobile-disrupt-btn.active {
-  color: var(--neon-cyan);
-  text-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
-}
 
 .mobile-zoom-group {
   display: flex;
@@ -1985,8 +2358,92 @@ body.ui-hidden #ui-hide-btn {
   bottom: calc(44px + env(safe-area-inset-bottom, 0px));
 }
 
-/* Hidden UI mode — panel/CTA/picker/status collapse; hide button stays */
+/* Hidden UI mode — panel/CTA/picker/status/samples collapse; hide button stays */
 body.mobile-ui-hidden.is-phone #mobile-panel   { display: none !important; }
 body.mobile-ui-hidden.is-phone #mobile-cta     { display: none !important; }
 body.mobile-ui-hidden.is-phone #source-picker  { display: none !important; }
 body.mobile-ui-hidden.is-phone #status-bar     { display: none !important; }
+body.mobile-ui-hidden.is-phone #sample-panel   { display: none !important; }
+
+/* ─── Stream mode (?stream=1) — OBS browser source overlay ──────────── */
+
+/* Transparent background so OBS composites the particle field over game/cam */
+body.stream-mode {
+  background: transparent !important;
+}
+
+/* Remove scanline overlay — it adds a faint tinted bar that looks bad over video */
+body.stream-mode::after {
+  display: none !important;
+}
+
+/* Hide all HUD chrome */
+body.stream-mode #hud,
+body.stream-mode #source-picker,
+body.stream-mode #epilepsy-warning,
+body.stream-mode #status-bar,
+body.stream-mode #sample-panel,
+body.stream-mode #error-toast,
+body.stream-mode #now-playing,
+body.stream-mode #stream-btn,
+body.stream-mode #stream-tooltip,
+body.stream-mode .cursor-trail,
+body.stream-mode #cursor,
+body.stream-mode #cursor-ring {
+  display: none !important;
+}
+
+/* Stream hint — "click to activate mic" — center-bottom, fades out on use */
+#stream-hint {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  border-radius: 4px;
+  color: rgba(0, 240, 255, 0.85);
+  font-family: "Orbitron", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 8px 18px;
+  cursor: pointer !important;
+  transition: opacity 600ms ease;
+  z-index: 10;
+  /* Hidden outside stream mode */
+  display: none;
+}
+body.stream-mode #stream-hint {
+  display: block;
+}
+body.stream-mode #stream-hint.hint-dismissed {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Tiny attribution credit — top-right, very faint, fades after 8s */
+#stream-credit {
+  position: fixed;
+  top: 14px;
+  right: 16px;
+  font-family: "Orbitron", monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(0, 240, 255, 0.22);
+  pointer-events: none;
+  z-index: 10;
+  opacity: 1;
+  transition: opacity 2s ease;
+  /* Hidden outside stream mode */
+  display: none;
+}
+body.stream-mode #stream-credit {
+  display: block;
+}
+body.stream-mode #stream-credit.credit-fade {
+  opacity: 0;
+}
