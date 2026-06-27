@@ -238,6 +238,70 @@ UX changes:
 - Tokens live in Flask signed-cookie sessions (`PERMANENT_SESSION_LIFETIME=30d`).
 - Polling cadence (1500ms) sits well under Spotify's ~180 req/min rate cap.
 
+### Phase 6 — Mobile demo experience ✓
+
+Goal: phone-first demo mode for screen recording + social sharing (Instagram, showing to people in person). Tablets included as phones.
+
+**Detection:**
+```js
+function detectPhone() {
+  const coarse = window.matchMedia("(pointer: coarse)").matches;
+  const touch  = navigator.maxTouchPoints > 1;
+  const ua     = /Mobi|Android|iPhone|iPod/i.test(navigator.userAgent);
+  return (coarse && touch) || ua;
+}
+const IS_PHONE = detectPhone();
+document.body.classList.toggle("is-phone", IS_PHONE);
+```
+Set before any DOM refs. The `is-phone` class on `<body>` drives all mobile overrides via CSS.
+
+**Performance budget (targeting iPhone 13 Pro Max and newer):**
+- 15,000 particles (down from 60,000 desktop)
+- `pixelRatioLimit: 1.5` (iPhones have dpr=3; native bloom is 4× more expensive; capping to 1.5 makes it affordable)
+- `Visualizer` constructor: `constructor(canvas, { particleCount = 60000, pixelRatioLimit = 2 } = {})`
+- `let PARTICLE_COUNT` (was `const`) — mutated at constructor call time
+
+**Mobile-locked behaviors:**
+- Shape: heart, locked (reset re-applies heart)
+- Audio source: microphone only (system/file/spotify buttons hidden)
+- All desktop UI hidden via `.is-phone` CSS class (tuning panel, zoom row, help, cast, etc.)
+- Custom cursor + trail hidden
+
+**Mobile UI elements:**
+- `#mobile-panel`: fixed at bottom, two horizontally-scrollable rows (presets + palettes) + actions row
+  - Actions row: `↺ reset` · `↯ disrupt` · `− zoom +`
+- `#mobile-hide-btn`: centered below nameplate, toggles `.mobile-ui-hidden` to collapse bottom UI for clean screen recording
+- `#mobile-cta`: "more features on desktop" dim text above panel
+
+**Disrupt on mobile:**
+- `↯ disrupt` button in mobile panel actions row toggles `_cursorDisruptActive`
+- `touchstart`/`touchmove` on canvas → `viz.screenToWorld(touch.clientX, touch.clientY)` → `viz.setCursorDisrupt(world, true)`
+- `touchend`/`touchcancel` → `viz.setCursorDisrupt(null, false)`
+- Uses `{ passive: false }` on touchstart/touchmove to allow `e.preventDefault()` (blocks scroll while disrupting)
+
+**iOS safe area:**
+- `viewport-fit=cover` in viewport meta
+- All bottom-anchored elements use `calc(Npx + env(safe-area-inset-bottom, 0px))`
+
+**Nameplate:**
+- Credit section replaced with `add me on discord · fps_krow` (removed GitHub/LinkedIn/personal site links for semi-anonymous demo/social sharing use)
+
+**Audio for screen recording:**
+- Mobile mic captures ambient audio from environment; user asks someone nearby to play music on their device
+- File upload intentionally left hidden on mobile (no use case for planned recordings that outweighs simplicity)
+- Spotify watcher works on mobile but is hidden from the source picker UI
+
+**Deployment ops (squash merge divergence):**
+- Local git proxy returns HTTP 403 on pushes to `staging` and `main` — push to feature branches only
+- All deploys: push feature branch → `mcp__github__create_pull_request` → `mcp__github__merge_pull_request` (squash)
+- Squash merges cause divergence on every subsequent PR → merge conflicts
+- Resolution: `git fetch origin staging && git merge origin/staging --no-edit`, then Python auto-resolve (always take HEAD):
+  ```python
+  re.sub(r'<<<<<<< HEAD\n(.*?)=======\n.*?>>>>>>> origin/staging\n',
+         lambda m: m.group(1), text, flags=re.DOTALL)
+  ```
+- staging → main PRs also squash-merge; same conflict pattern applies (create temp branch from staging, merge origin/main, resolve, push, PR)
+
 ---
 
 ## Key Decisions Log
@@ -254,6 +318,10 @@ UX changes:
 | ShaderMaterial over PointsMaterial | Need per-particle audio-reactive deformation in the vertex shader. |
 | No `connect(destination)` for live sources | Mic feedback, tab-audio doubling. |
 | Asymmetric band smoothing | Bass kicks should punch, then decay — symmetric smoothing flattens transients. |
+| Mobile: mic-only, no file/system/spotify | Simplicity. Screen recording use case just needs ambient mic. User asks someone nearby to play music — simpler than file upload or companion mode. |
+| Mobile disrupt via touch not tap-to-toggle | Finger holds position → particles scatter while touching, restore on lift. Feels physical. |
+| Nameplate credit → Discord only | Semi-anonymous for social sharing; keeps irl links off demo screenshots. |
+| `pixelRatioLimit: 1.5` on mobile | iPhone native dpr=3 makes bloom 4× more expensive than at dpr=1.5. Biggest single mobile GPU win. |
 
 ---
 
