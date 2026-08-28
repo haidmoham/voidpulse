@@ -1,54 +1,54 @@
-# Voidpulse agent instructions
+# NEBVIS agent instructions
 
-Voidpulse is a browser-first reimagining of the iTunes Magnetosphere visualizer. Preserve the fast, inspectable architecture and the audio-reactive behavior that makes the project distinct.
+NEBVIS is a browser-first astrophysical music visualizer. Build one coherent,
+runnable pass before asking for micro-decisions, then keep localhost available
+for visual iteration.
 
-## Read first
+## Product invariants
 
-- Read `README.md` and the relevant source before changing behavior.
-- Prefer the smallest change that preserves the existing interaction model.
-- Treat Git history as the archive for completed build phases and superseded approaches.
+- Keep browser-native tab/window audio capture as the primary source flow.
+- Tab capture must start from a direct user gesture through
+  `getDisplayMedia()`; request audio and the Chromium-required video track,
+  discard video after selection, and show a useful error when the chosen
+  surface has no audio.
+- Never connect microphone or captured tab audio to
+  `AudioContext.destination`. File playback may connect through gain.
+- Keep music response meaningful and stable: low frequencies alter structure,
+  mids alter nebular density, highs alter starlight, and onsets reveal light
+  echoes. Do not use flashing or rapid random hue cycling.
+- Respect reduced motion, mobile safe areas, capped device pixel ratio,
+  visibility pausing, WebGL failure, and browser autoplay rules.
 
-## Architecture
+## Stack and structure
 
-- Backend: Flask. It serves the app and Spotify auth/API proxy routes.
-- Frontend: vanilla ES modules + three.js. Do not add a bundler or npm toolchain by default.
-- Audio analysis stays in the browser.
-- Primary real-audio sources are system/tab audio, microphone, and file input.
-- Do not connect live microphone or system/tab capture to `AudioContext.destination`; that causes feedback or duplicate playback.
-- Existing FFT analysis remains the fallback for real-audio sources.
+- Vite + React + strict TypeScript.
+- Three.js owns the ambient visual field; semantic controls and status stay in
+  the DOM.
+- Keep browser APIs behind typed boundaries in `src/audio/`.
+- Keep renderer, shaders, and scene math in `src/visualization/`.
+- Prefer focused modules and pure helpers over framework-wide abstractions.
 
-## Beat and Spotify model
+## Design workflow
 
-- Spotify is a background listening-along service, not an audio source.
-- Do not restore in-browser Spotify playback.
-- New Spotify apps cannot rely on the deprecated `/v1/audio-analysis` or `/v1/audio-features` endpoints.
-- ReccoBeats provides tempo, energy, valence, and related track features.
-- Essentia.js provides real beat alignment from captured PCM when real audio is available.
-- `spotify.phaseLock()` may align the synthetic Spotify pulse to an externally detected beat.
-- Keep synthetic BPM behavior as a fallback when Spotify is active but no analyzable audio source is present.
+- Search prior art and the private design vocabulary before inventing.
+- Treat Legos as abstract compositional blocks. Riff, mutate, layer, invert, or
+  ablate them until they belong to NEBVIS; preserve useful invariants, not
+  source aesthetics.
+- The user owns taste and final art direction. Implement a bold first pass,
+  verify it in a real browser, then respond literally to corrections.
+- Keep controls crisp and immediate while the visual field carries the
+  spectacle. No generic dashboard chrome.
 
-## Visual and mobile constraints
+## Verification
 
-- Preserve the synthwave visual language and custom shader particle field.
-- The audio source picker is primary UI. Do not bury it under secondary controls.
-- Mobile targets roughly 15,000 particles with `pixelRatioLimit: 1.5`.
-- Mobile keeps the heart shape, microphone-first UI, reduced controls, and touch-driven disrupt interaction.
-- Respect iOS safe-area insets and browser autoplay rules.
-
-## Debugging
-
-- When audio appears silent, inspect `engine.bands()` first.
-- All-zero bands usually mean the audio graph is not connected.
-- Non-zero but weak/stuck bands usually indicate source gain, limiting, or analysis behavior rather than rendering failure.
-- Verify changes in the browser with the actual source mode involved.
+- Run `npm run typecheck`, `npm test`, `npm run build`, and the configured
+  anti-slop Oxlint check.
+- Browser QA must exercise the source-picker UI, demo fallback, resize/mobile
+  layout, reduced-motion behavior, and console errors.
+- A successful build is not proof of a successful visualizer.
 
 ## Deployment
 
-- Railway is the deployment target.
-- Preserve current environment-variable and health-check behavior.
-- Keep secrets in environment configuration, never in the repository.
-- Use the repository's current Git/PR deployment path instead of inventing a new release system.
-
-## Agent boundary
-
-Use agents aggressively for implementation friction, debugging, API inspection, and repetitive edits. Keep product judgment, aesthetic direction, and interpretation of surprising behavior with the human unless explicitly delegated. Verify important claims against runtime behavior or primary documentation.
+- Vercel is the deployment target.
+- Canonical public identity: **NEBVIS** at **nebvis.shin86.dev**.
+- Keep secrets out of the repository.

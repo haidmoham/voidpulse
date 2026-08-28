@@ -1,24 +1,32 @@
-# Voidpulse
+# NEBVIS
 
-A web reimagining of the iTunes Magnetosphere visualizer: a GPU particle field that swirls, breathes, and reacts to live audio.
+**Turn sound into gravity.**
+
+NEBVIS is a real-time astrophysical music visualizer built with React,
+TypeScript, Three.js, and the Web Audio API. Share an audio-playing browser tab,
+use a microphone, or load a local track; NEBVIS maps the signal into a lensed
+accretion field, nebular dust, light echoes, and bipolar jets.
 
 ## Run locally
 
 ```bash
-./scripts/dev.sh
+npm install
+npm run dev
 ```
 
-Then open http://localhost:5002
+Open the printed local URL in Chrome or Edge for tab-audio capture.
 
-## Audio sources
-
-1. **Tab audio** — share a Chrome tab with audio (the cool one — captures whatever's playing in the tab)
-2. **Microphone** — listens through the laptop mic
-3. **Audio file** — fallback; pick an mp3
-
-## Deploy
+## Checks
 
 ```bash
-./scripts/deploy.sh "what changed"
-./scripts/logs.sh
+npm run lint
+npm run typecheck
+npm test
+npm run build
 ```
+
+## Audio privacy
+
+Audio analysis happens locally in the browser. Captured audio is not uploaded.
+NEBVIS discards the video track returned by the browser's native share picker
+and never routes microphone or tab capture back to your speakers.

@@ -1,12 +1,8 @@
-.env
-*.pyc
-__pycache__/
-.venv/
-venv/
-*.egg-info/
+node_modules/
 dist/
-build/
-.pytest_cache/
+.vercel/
+coverage/
 *.log
 .DS_Store
-!.env.example
+.vercel
+.env*
